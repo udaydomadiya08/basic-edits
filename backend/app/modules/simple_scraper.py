@@ -159,32 +159,54 @@ class SimpleScraper:
                     continue
                 
                 raw_html = res.text
-                
-                # Strategy A: Regex high-res Javascript payload extraction
-                all_urls = re.findall(r'(https?://[^\s"\';\\<>]+?\.(?:jpg|jpeg|png))', raw_html)
+                soup = BeautifulSoup(raw_html, 'html.parser')
                 seen = set()
-                blacklist_domains = ["google.com", "gstatic.com", "googleusercontent.com", "adsystem.com", "doubleclick.net"]
+                blacklist_domains = ["googleusercontent.com", "adsystem.com", "doubleclick.net"]
                 
-                for img_url in all_urls:
-                    img_url = img_url.replace("\\u003d", "=").replace("\\u0026", "&").replace("\\", "")
-                    if any(domain in img_url.lower() for domain in blacklist_domains):
-                        continue
-                    if img_url not in seen:
-                        seen.add(img_url)
-                        results.append({
-                            "url": img_url,
-                            "title": query,
-                            "description": ""
-                        })
-                        if len(results) >= limit:
-                            break
-                            
-                # Strategy B: BS4 legacy HTML parsing fallback (if regex returns 0 links)
+                # Strategy A: Extract high-resolution external image redirects from legacy mobile anchor tags
+                for a in soup.find_all("a", href=True):
+                    href = a["href"]
+                    if "/url?q=" in href:
+                        match = re.search(r'/url\?q=([^&]+)', href)
+                        if match:
+                            dest_url = re.sub(r'&.*', '', requests.utils.unquote(match.group(1)))
+                            if dest_url.startswith("http") and dest_url.lower().endswith((".jpg", ".jpeg", ".png")) and not any(domain in dest_url.lower() for domain in blacklist_domains):
+                                if dest_url not in seen:
+                                    seen.add(dest_url)
+                                    results.append({
+                                        "url": dest_url,
+                                        "title": query,
+                                        "description": ""
+                                    })
+                                    if len(results) >= limit:
+                                        break
+                                        
+                # Strategy B: Fallback to high-res Javascript regex payload extraction
                 if not results:
-                    soup = BeautifulSoup(raw_html, 'html.parser')
+                    all_urls = re.findall(r'(https?://[^\s"\';\\<>]+?\.(?:jpg|jpeg|png))', raw_html)
+                    for img_url in all_urls:
+                        img_url = img_url.replace("\\u003d", "=").replace("\\u0026", "&").replace("\\", "")
+                        if any(domain in img_url.lower() for domain in blacklist_domains):
+                            continue
+                        if img_url not in seen:
+                            seen.add(img_url)
+                            results.append({
+                                "url": img_url,
+                                "title": query,
+                                "description": ""
+                            })
+                            if len(results) >= limit:
+                                break
+                                
+                # Strategy C: Fallback to static thumbnail source links (excluding standard logos)
+                if not results:
                     for img in soup.find_all("img"):
                         src = img.get("src")
-                        if src and src.startswith("http") and not "gif" in src and not any(domain in src.lower() for domain in blacklist_domains):
+                        if src and src.startswith("http") and not "gif" in src:
+                            if any(domain in src.lower() for domain in ["google.com", "gstatic.com"]):
+                                # Allow encrypted-tbn thumbnail links explicitly
+                                if "encrypted-tbn" not in src:
+                                    continue
                             results.append({
                                 "url": src,
                                 "title": img.get("alt", query),
