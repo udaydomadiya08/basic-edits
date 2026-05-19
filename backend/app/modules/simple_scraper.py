@@ -131,3 +131,43 @@ class SimpleScraper:
                     except: continue
         except: pass
         return results
+
+    def search_google(self, query, limit):
+        self.log(f"Google Images search for '{query}'...")
+        results = []
+        try:
+            # Modern Chrome on Windows user-agent with custom headers
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.5",
+                "Referer": "https://www.google.com/"
+            }
+            url = f"https://www.google.com/search?q={query}&tbm=isch"
+            res = requests.get(url, headers=headers, timeout=10)
+            
+            raw_html = res.text
+            # Regex to find all direct high-resolution image links in Javascript variables
+            all_urls = re.findall(r'(https?://[^\s"\';\\<>]+?\.(?:jpg|jpeg|png))', raw_html)
+            
+            seen = set()
+            blacklist_domains = ["google.com", "gstatic.com", "googleusercontent.com", "adsystem.com", "doubleclick.net"]
+            
+            for img_url in all_urls:
+                img_url = img_url.replace("\\u003d", "=").replace("\\u0026", "&").replace("\\", "")
+                if any(domain in img_url.lower() for domain in blacklist_domains):
+                    continue
+                if img_url not in seen:
+                    seen.add(img_url)
+                    results.append({
+                        "url": img_url,
+                        "title": query,
+                        "description": ""
+                    })
+                    if len(results) >= limit:
+                        break
+        except Exception as e:
+            self.log(f"Google Images error: {e}")
+            
+        self.log(f"Google Images found {len(results)} high-res candidate links.")
+        return results

@@ -150,12 +150,13 @@ class AIVideoEditor:
             attempts += 1
             print(f"🔍 Search Attempt {attempts} (Style: {style}, Got: {len(all_paths)}/{count})...")
             
-            # Use DuckDuckGo as primary, Yahoo as secondary
-            # Construct highly restrictive, targeted queries
+            # Query Google Images as primary, DuckDuckGo & Yahoo as secondary fallbacks
             main_query = f"\"{topic}\" {style} vertical portrait photo -text -logo -watermark -news -diagram -infographic"
-            print(f"🔍 Scraping DDG & Yahoo for '{style}' style...")
-            candidates = self.scraper.search_duckduckgo(main_query, 80)
-            candidates += self.scraper.search_yahoo(main_query, 60)
+            print(f"🔍 Scraping Google Images (Primary) & DDG/Yahoo for '{style}' style...")
+            candidates = self.scraper.search_google(main_query, 80)
+            if len(candidates) < 15:
+                candidates += self.scraper.search_duckduckgo(main_query, 80)
+                candidates += self.scraper.search_yahoo(main_query, 60)
             
             # Shuffle scraped candidates list to ensure a unique selection of images is filtered and downloaded
             random.shuffle(candidates)
