@@ -182,8 +182,8 @@ class AIVideoEditor:
             print(f"🔍 Search Attempt {attempts} (Style: {style}, Got: {len(all_paths)}/{count})...")
             
             # Universal Super-Scraper Pipeline (queries Pexels, Bing, Google, DuckDuckGo, Yahoo for maximum coverage)
-            main_query = f"\"{topic}\" {style} vertical portrait photo -text -logo -watermark -news -diagram -infographic"
-            stock_query = f"{topic} {style}".replace('"', '')
+            main_query = f"{topic} {style} vertical portrait"
+            stock_query = f"{topic} {style}"
             
             print(f"🔍 Multi-Scraping Pexels, Bing, Google, DDG & Yahoo for '{style}' style...")
             candidates = []
