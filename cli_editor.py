@@ -36,11 +36,14 @@ class AIVideoEditor:
         files = [f for f in os.listdir(self.music_dir) if f.endswith(('.mp3', '.wav'))]
         return sorted(files)
 
-    async def get_autocorrected_topic(self, topic: str) -> str:
-        """Correct typos in user input topic using the LLM Router before querying search engines"""
+    async def get_autocorrected_topic(self, topic: str, song_name: str = "") -> str:
+        """Correct typos and resolve ambiguous entities in user input using LLM Router with optional song context"""
+        song_context = f"\nVideo Music Track: {song_name}" if song_name else ""
         prompt = (
-            f"You are a search query optimizer. Correct any typos or spelling mistakes in the following search topic "
-            f"and return ONLY the official, correctly spelled name. Do not explain, do not add quotes, just return the name.\n"
+            f"You are an expert AI search query optimizer. Given a user input search topic, identify the core celebrity, "
+            f"character, or entity they are looking for. Resolve any typos, spelling mistakes, or ambiguous descriptions "
+            f"(e.g., if they write 'weekend pop artist' or 'weekend', and the music track is by 'The Weeknd', resolve it to 'The Weeknd'). "
+            f"Return ONLY the official, correctly spelled entity name. Do not explain, do not add quotes, just return the name.{song_context}\n"
             f"Topic: {topic}\n"
             f"Corrected Name:"
         )
@@ -342,7 +345,7 @@ async def main():
     topic = input("Enter topic: ")
     if not topic: return
     
-    corrected_topic = await editor.get_autocorrected_topic(topic)
+    corrected_topic = await editor.get_autocorrected_topic(topic, songs[song_idx])
     if corrected_topic.lower() != topic.lower():
         print(f"🪄 Autocorrected search term: '{topic}' ➔ '{corrected_topic}'")
         topic = corrected_topic
