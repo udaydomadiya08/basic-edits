@@ -242,9 +242,13 @@ class AIVideoEditor:
             attempts += 1
             print(f"🔍 Search Attempt {attempts} (Style: {style}, Got: {len(all_paths)}/{count})...")
             
-            # Universal Super-Scraper Pipeline (queries Pexels, Bing, Google, DuckDuckGo, Yahoo for maximum coverage)
-            main_query = f"{topic} {style} vertical portrait"
-            stock_query = f"{topic} {style}"
+            # Universal Super-Scraper Pipeline: Case-insensitively deduplicate words to prevent duplicate terms like "vertical vertical"
+            query_words = []
+            for word in f"{topic} {style}".split():
+                if word.lower() not in [w.lower() for w in query_words]:
+                    query_words.append(word)
+            main_query = " ".join(query_words)
+            stock_query = main_query
             
             print(f"🔍 Multi-Scraping Pexels, Bing, Google, DDG & Yahoo for '{style}' style...")
             candidates = []
