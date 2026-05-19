@@ -72,12 +72,19 @@ class GeminiAPIManager:
             
             # Initialize model configurations based on free tier limits
             self.models = {
-                "gemini-2.0-flash": ModelConfig(
-                    name="gemini-2.0-flash",
+                "gemini-3.1-flash": ModelConfig(
+                    name="gemini-3.1-flash",
                     category="text",
                     rate_limit=RateLimit(rpm=15, tpm=1000000, rpd=1500),
                     performance_score=10.0,
                     cost_efficiency=9.9
+                ),
+                "gemini-2.5-flash": ModelConfig(
+                    name="gemini-2.5-flash",
+                    category="text",
+                    rate_limit=RateLimit(rpm=15, tpm=1000000, rpd=1500),
+                    performance_score=9.8,
+                    cost_efficiency=9.7
                 ),
                 "gemini-1.5-flash": ModelConfig(
                     name="gemini-1.5-flash",
@@ -90,7 +97,7 @@ class GeminiAPIManager:
                     name="gemini-1.5-pro",
                     category="text",
                     rate_limit=RateLimit(rpm=5, tpm=500000, rpd=360),
-                    performance_score=9.6,
+                    performance_score=9.0,
                     cost_efficiency=8.0
                 ),
                 
