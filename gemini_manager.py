@@ -72,26 +72,33 @@ class GeminiAPIManager:
             
             # Initialize model configurations based on free tier limits
             self.models = {
-                "gemini-3.1-flash": ModelConfig(
-                    name="gemini-3.1-flash",
+                "gemini-2.5-flash": ModelConfig(
+                    name="gemini-2.5-flash",
                     category="text",
                     rate_limit=RateLimit(rpm=15, tpm=1000000, rpd=1500),
                     performance_score=10.0,
                     cost_efficiency=9.9
                 ),
-                "gemini-2.5-flash": ModelConfig(
-                    name="gemini-2.5-flash",
-                    category="text",
-                    rate_limit=RateLimit(rpm=15, tpm=1000000, rpd=1500),
-                    performance_score=9.8,
-                    cost_efficiency=9.7
-                ),
                 "gemini-1.5-flash": ModelConfig(
                     name="gemini-1.5-flash",
                     category="text",
                     rate_limit=RateLimit(rpm=15, tpm=1000000, rpd=1500),
+                    performance_score=9.8,
+                    cost_efficiency=9.5
+                ),
+                "gemini-2.0-flash": ModelConfig(
+                    name="gemini-2.0-flash",
+                    category="text",
+                    rate_limit=RateLimit(rpm=15, tpm=1000000, rpd=1500),
                     performance_score=9.5,
                     cost_efficiency=9.5
+                ),
+                "gemini-3.1-flash": ModelConfig(
+                    name="gemini-3.1-flash",
+                    category="text",
+                    rate_limit=RateLimit(rpm=15, tpm=1000000, rpd=1500),
+                    performance_score=9.0,
+                    cost_efficiency=9.9
                 ),
                 "gemini-1.5-pro": ModelConfig(
                     name="gemini-1.5-pro",
@@ -410,7 +417,7 @@ class GeminiAPIManager:
                 if fallback_key and (fallback_key != api_key or fallback_model != selected_model):
                     logger.info(f"Retrying with fallback (Key: {fallback_key[:10]}..., Model: {fallback_model})")
                     kwargs["retry_count"] = retry_count + 1
-                    return await self.make_api_call(prompt, category, fallback_model, **kwargs)
+                    return await self.make_api_call(prompt, category, None, **kwargs)
             
             return {
                 "error": error_msg,
