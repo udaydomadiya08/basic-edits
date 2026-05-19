@@ -64,9 +64,60 @@ class AIVideoEditor:
             return response["content"].strip().replace('"', '')
         return f"The Power of {topic.capitalize()}"
 
-    async def filter_results_with_ai(self, topic, results, is_hook=False):
+    async def analyze_topic_dynamically(self, topic: str) -> dict:
+        """Dynamically analyze the user input topic with AI to determine positive/negative criteria for zero-hardcoding auditing"""
+        prompt = f"""
+        You are an expert AI media auditor.
+        Analyze the search topic: '{topic}'
+        
+        Generate a highly precise JSON specification for validating scraped image metadata.
+        1. Identify the core subject/entity.
+        2. Identify 'positive_keywords' that MUST appear in candidate titles or descriptions to prove it is actually about this subject (e.g. ['jalebi', 'sweet'] for 'jalebi'; ['weeknd', 'starboy'] for 'The Weeknd').
+        3. Identify 'negative_keywords' representing irrelevant contexts, parodies, press event spam, blog/generator screenshots, reviews, or other off-topic contexts that must be rejected.
+        
+        Return ONLY a raw, clean JSON object matching this schema:
+        {{
+          "core_subject": "...",
+          "positive_keywords": ["word1", "word2", ...],
+          "negative_keywords": ["word1", "word2", ...]
+        }}
+        STRICT: Do not provide any markdown, no explanation, no backticks, just the JSON string.
+        """
+        
+        # Safe default spec in case of rate-limiting/errors
+        spec = {
+            "core_subject": topic,
+            "positive_keywords": [w.lower() for w in topic.split() if len(w) > 2],
+            "negative_keywords": ["infographic", "diagram", "news", "event", "poster", "chart", "map", "parody", "cartoon", "caricature", "illustration", "sketch", "drawing", "press", "bash", "success party", "red carpet", "paparazzi", "screenshot", "blog", "article", "generator", "best ai", "top 10", "how to"]
+        }
+        
+        try:
+            response = await self.router.get_response(prompt, temperature=0.0)
+            if response["status"] == "success":
+                content = response["content"].strip()
+                if content.startswith("```"):
+                    content = re.sub(r"^```[a-zA-Z]*\n", "", content)
+                    content = re.sub(r"\n```$", "", content)
+                parsed = json.loads(content)
+                if isinstance(parsed, dict):
+                    spec["core_subject"] = parsed.get("core_subject", topic)
+                    spec["positive_keywords"] = [w.lower() for w in parsed.get("positive_keywords", []) if len(w) > 1]
+                    spec["negative_keywords"] = [w.lower() for w in parsed.get("negative_keywords", []) if len(w) > 1]
+                    print(f"✨ AI Dynamic Topic Analysis Complete for '{topic}':")
+                    print(f"   Subject: {spec['core_subject']}")
+                    print(f"   Positives: {spec['positive_keywords']}")
+                    print(f"   Negatives: {spec['negative_keywords']}")
+        except Exception as e:
+            logger.warning(f"Error during dynamic topic analysis: {e}")
+            
+        return spec
+
+    async def filter_results_with_ai(self, topic, results, is_hook=False, topic_spec=None):
         if not results: return []
         
+        if not topic_spec:
+            topic_spec = await self.analyze_topic_dynamically(topic)
+            
         # Prepare metadata for Gemini
         metadata_list = []
         for i, res in enumerate(results):
@@ -76,28 +127,20 @@ class AIVideoEditor:
         STRICT AUDIT: You are a professional video editor. 
         TOPIC: '{topic}'
         
-        DYNAMIC SUBJECT DETERMINATION:
-        First, determine if the topic is:
-        - TYPE A (A specific, unique entity/person/character/masterpiece, e.g. 'Mona Lisa', 'The Weeknd', 'Elon Musk', 'Jethalal').
-        - TYPE B (A general concept, theme, vibe, or category, e.g. 'environment', 'cyberpunk', 'nature', 'love', 'technology').
+        DYNAMIC SUBJECT SPECIFICATION:
+        - Core Subject: {topic_spec.get('core_subject', topic)}
+        - Must contain: {', '.join(topic_spec.get('positive_keywords', []))}
+        - Must NOT contain: {', '.join(topic_spec.get('negative_keywords', []))}
         
         AUDITING INSTRUCTIONS:
-        - For TYPE A (Specific Entity): You must enforce an absolute Zero-Tolerance rule. Only accept the authentic, classic subject/character itself. You MUST DISCARD any fan-art, cartoons, parodies, or caricature versions. 
-        - For TYPE B (General Concept/Vibe): You must accept high-quality, professional, and cinematic images that visually and conceptually represent or match the theme/vibe of the topic '{topic}'. Discard only things that are completely off-topic, messy, ugly, or irrelevant.
-        
-        CRITICAL NO-LEAK METADATA AUDIT:
-        Scan both the 'Title' and 'Desc' (Description) for each candidate index.
-        You MUST DISCARD any candidates that are:
-        1. Paparazzi photos, press event groups, party crowds, or red carpet bashes featuring multiple actors/people or success parties.
-        2. Book covers, news article screenshots, blogs, generators, reviews, text overlay lists, infographics, diagrams, or charts.
-        3. Prominent text overlays, logos, or watermarks.
-        
-        The approved candidate must be a clean, aesthetic, single-subject portrait, artwork, wallpaper, or icon representing the core topic '{topic}' beautifully.
+        Scan both the 'Title' and 'Desc' (Description) for each candidate index in the Metadata List.
+        You MUST DISCARD any candidates that match the negative indicators or are parodies/cartoons/fan-art/crowd shots.
+        The approved candidate must represent the core subject beautifully, accurately, and cleanly as a high-quality vertical wallpaper.
         
         Metadata List:
         {chr(10).join(metadata_list)}
         
-        Return a JSON list of indices that are 100% ACCURATE and strictly fit the audited subject type.
+        Return a JSON list of indices that are 100% ACCURATE.
         Example: [0, 2, 5]
         STRICT: Do not provide any explanation, chat, or additional text. Only the JSON list.
         """
@@ -138,38 +181,39 @@ class AIVideoEditor:
         
         return []
 
-    def filter_results_locally(self, topic, results):
-        """Ultra-resilient local fallback filter using strict keyword matching"""
+    def filter_results_locally(self, topic, results, topic_spec=None):
+        """Ultra-resilient local fallback filter using dynamically generated AI criteria (Zero Hardcoding!)"""
         valid_urls = []
         
-        # Avoid matching generic search metadata or stop words
-        stop_words = {"the", "a", "an", "pop", "artist", "musician", "singer", "actor", "celeb", "celebrity", "man", "woman", "vertical", "wallpaper", "photo", "art"}
-        important_words = [w for w in topic.lower().split() if w not in stop_words and len(w) > 2]
-        if not important_words:
-            important_words = [w for w in topic.lower().split() if len(w) > 1]
+        if not topic_spec:
+            # Create a basic default spec synchronously to keep signature compatible
+            stop_words = {"the", "a", "an", "pop", "artist", "musician", "singer", "actor", "celeb", "celebrity", "man", "woman", "vertical", "wallpaper", "photo", "art"}
+            important_words = [w for w in topic.lower().split() if w not in stop_words and len(w) > 2]
+            if not important_words:
+                important_words = [w for w in topic.lower().split() if len(w) > 1]
+            topic_spec = {
+                "positive_keywords": important_words,
+                "negative_keywords": ["infographic", "diagram", "news", "event", "poster", "chart", "map", "parody", "cartoon", "caricature", "illustration", "sketch", "drawing", "press", "bash", "success party", "red carpet", "paparazzi", "screenshot", "blog", "article", "generator", "best ai", "top 10", "how to"]
+            }
             
-        negative_words = {
-            "infographic", "diagram", "news", "event", "poster", "chart", "map", 
-            "parody", "cartoon", "caricature", "illustration", "sketch", "drawing",
-            "press", "bash", "success party", "red carpet", "paparazzi", "screenshot",
-            "blog", "article", "generator", "best ai", "top 10", "how to"
-        }
+        pos_words = [w.lower() for w in topic_spec.get("positive_keywords", [])]
+        neg_words = [w.lower() for w in topic_spec.get("negative_keywords", [])]
         
         for res in results:
             title = res.get("title", "").lower()
             desc = res.get("description", "").lower()
             
-            # Check negative words
-            if any(w in title or w in desc for w in negative_words):
+            # Check dynamic negative words
+            if any(w in title or w in desc for w in neg_words):
                 continue
                 
-            # If multi-word topic (e.g. "Romeo Montague", "The Weeknd"), require ALL keywords to match
-            # to guarantee 100% strict relevance and avoid single-word generic false positives.
-            if len(important_words) > 1:
-                if not all(w in title or w in desc for w in important_words):
+            # If multi-word dynamic positive, require ALL words to be present
+            # If single-word, require at least one word to be present
+            if len(pos_words) > 1:
+                if not all(w in title or w in desc for w in pos_words):
                     continue
-            else:
-                if not any(w in title or w in desc for w in important_words):
+            elif len(pos_words) == 1:
+                if not any(w in title or w in desc for w in pos_words):
                     continue
                     
             valid_urls.append(res["url"])
@@ -179,6 +223,9 @@ class AIVideoEditor:
     async def fetch_images(self, topic, count=15):
         all_paths = []
         attempts = 0
+        
+        # 1. Analyze topic dynamically with AI before querying search engines (Zero Hardcoding!)
+        topic_spec = await self.analyze_topic_dynamically(topic)
         
         styles = [
             "vertical wallpaper",
@@ -231,13 +278,13 @@ class AIVideoEditor:
             # Shuffle scraped candidates list to ensure a unique selection of images is filtered and downloaded
             random.shuffle(candidates)
             
-            # AI Filter
-            verified_urls = await self.filter_results_with_ai(topic, candidates)
+            # AI Filter using dynamically generated specifications
+            verified_urls = await self.filter_results_with_ai(topic, candidates, topic_spec=topic_spec)
             
-            # Resilient local fallback if AI filter failed or was rate-limited
+            # Resilient local fallback using dynamically generated specifications
             if not verified_urls:
                 print("⚠️ AI Filter rate-limited or unavailable. Activating ultra-resilient local metadata filter...")
-                verified_urls = self.filter_results_locally(topic, candidates)
+                verified_urls = self.filter_results_locally(topic, candidates, topic_spec=topic_spec)
             
             # Download
             if verified_urls:
