@@ -135,39 +135,68 @@ class SimpleScraper:
     def search_google(self, query, limit):
         self.log(f"Google Images search for '{query}'...")
         results = []
-        try:
-            # Modern Chrome on Windows user-agent with custom headers
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.5",
-                "Referer": "https://www.google.com/"
-            }
-            url = f"https://www.google.com/search?q={query}&tbm=isch"
-            res = requests.get(url, headers=headers, timeout=10)
-            
-            raw_html = res.text
-            # Regex to find all direct high-resolution image links in Javascript variables
-            all_urls = re.findall(r'(https?://[^\s"\';\\<>]+?\.(?:jpg|jpeg|png))', raw_html)
-            
-            seen = set()
-            blacklist_domains = ["google.com", "gstatic.com", "googleusercontent.com", "adsystem.com", "doubleclick.net"]
-            
-            for img_url in all_urls:
-                img_url = img_url.replace("\\u003d", "=").replace("\\u0026", "&").replace("\\", "")
-                if any(domain in img_url.lower() for domain in blacklist_domains):
+        
+        user_agents = [
+            # 1. Legacy Mobile (returns basic HTML, completely bypasses TLS fingerprint checks)
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 8_0 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12A366 Safari/600.1.4",
+            # 2. Modern Desktop Chrome
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        ]
+        
+        for ua in user_agents:
+            try:
+                headers = {
+                    "User-Agent": ua,
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                    "Accept-Language": "en-US,en;q=0.5",
+                    "Referer": "https://www.google.com/"
+                }
+                url = f"https://www.google.com/search?q={query}&tbm=isch"
+                res = requests.get(url, headers=headers, timeout=10)
+                self.log(f"Google status: {res.status_code} | Length: {len(res.text)} | Agent: {ua[:30]}...")
+                
+                if res.status_code != 200:
                     continue
-                if img_url not in seen:
-                    seen.add(img_url)
-                    results.append({
-                        "url": img_url,
-                        "title": query,
-                        "description": ""
-                    })
-                    if len(results) >= limit:
-                        break
-        except Exception as e:
-            self.log(f"Google Images error: {e}")
-            
-        self.log(f"Google Images found {len(results)} high-res candidate links.")
+                
+                raw_html = res.text
+                
+                # Strategy A: Regex high-res Javascript payload extraction
+                all_urls = re.findall(r'(https?://[^\s"\';\\<>]+?\.(?:jpg|jpeg|png))', raw_html)
+                seen = set()
+                blacklist_domains = ["google.com", "gstatic.com", "googleusercontent.com", "adsystem.com", "doubleclick.net"]
+                
+                for img_url in all_urls:
+                    img_url = img_url.replace("\\u003d", "=").replace("\\u0026", "&").replace("\\", "")
+                    if any(domain in img_url.lower() for domain in blacklist_domains):
+                        continue
+                    if img_url not in seen:
+                        seen.add(img_url)
+                        results.append({
+                            "url": img_url,
+                            "title": query,
+                            "description": ""
+                        })
+                        if len(results) >= limit:
+                            break
+                            
+                # Strategy B: BS4 legacy HTML parsing fallback (if regex returns 0 links)
+                if not results:
+                    soup = BeautifulSoup(raw_html, 'html.parser')
+                    for img in soup.find_all("img"):
+                        src = img.get("src")
+                        if src and src.startswith("http") and not "gif" in src and not any(domain in src.lower() for domain in blacklist_domains):
+                            results.append({
+                                "url": src,
+                                "title": img.get("alt", query),
+                                "description": ""
+                            })
+                            if len(results) >= limit:
+                                break
+                                
+                if results:
+                    break  # Successfully found links!
+            except Exception as e:
+                self.log(f"Google Agent error: {e}")
+                
+        self.log(f"Google Images found {len(results)} candidate links.")
         return results
