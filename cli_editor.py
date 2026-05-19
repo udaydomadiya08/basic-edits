@@ -96,16 +96,25 @@ class AIVideoEditor:
             try:
                 content = response["content"].strip()
                 
-                # Robust regex to find the first JSON-like array in the text
-                match = re.search(r"\[[\s\d,]*\]", content)
-                if match:
-                    indices = json.loads(match.group(0))
+                # Strip markdown code blocks if present
+                clean_content = content
+                if clean_content.startswith("```"):
+                    clean_content = re.sub(r"^```[a-zA-Z]*\n", "", clean_content)
+                    clean_content = re.sub(r"\n```$", "", clean_content)
+                clean_content = clean_content.strip()
+                
+                # Find JSON array boundaries
+                start_idx = clean_content.find('[')
+                end_idx = clean_content.rfind(']')
+                if start_idx != -1 and end_idx != -1:
+                    array_str = clean_content[start_idx:end_idx+1]
+                    indices = json.loads(array_str)
                     valid_urls = [results[i]['url'] for i in indices if isinstance(i, int) and i < len(results)]
                     if valid_urls:
                         print(f"✅ AI Audit: Approved {len(valid_urls)}/{len(results)} images.")
                         return valid_urls
                 
-                logger.warning(f"AI Audit: No valid list found in response. Raw: {content[:100]}...")
+                logger.warning(f"AI Audit: No valid list found in response. Raw: {content[:150]}...")
             except Exception as e:
                 logger.warning(f"AI Filter parse error: {e}")
         
@@ -114,7 +123,13 @@ class AIVideoEditor:
     def filter_results_locally(self, topic, results):
         """Ultra-resilient local fallback filter using strict keyword matching"""
         valid_urls = []
-        topic_words = set(topic.lower().split())
+        
+        # Avoid matching generic search metadata or stop words
+        stop_words = {"the", "a", "an", "pop", "artist", "musician", "singer", "actor", "celeb", "celebrity", "man", "woman", "vertical", "wallpaper", "photo", "art"}
+        important_words = [w for w in topic.lower().split() if w not in stop_words and len(w) > 2]
+        if not important_words:
+            important_words = [w for w in topic.lower().split() if len(w) > 1]
+            
         negative_words = {"infographic", "diagram", "news", "event", "poster", "chart", "map"}
         
         for res in results:
@@ -125,8 +140,8 @@ class AIVideoEditor:
             if any(w in title or w in desc for w in negative_words):
                 continue
                 
-            # Check if any word of the topic is present in title or desc to guarantee strict relevance
-            if any(w in title or w in desc for w in topic_words):
+            # Check if any important keyword of the topic is present in title or desc to guarantee strict relevance
+            if any(w in title or w in desc for w in important_words):
                 valid_urls.append(res["url"])
                 
         return valid_urls
@@ -331,9 +346,9 @@ async def main():
     if corrected_topic.lower() != topic.lower():
         print(f"🪄 Autocorrected search term: '{topic}' ➔ '{corrected_topic}'")
         topic = corrected_topic
-    
+    print("Include introductory hook/title phase? (y/N): ")
     use_hook = input("Include introductory hook/title phase? (y/N): ").strip().lower() == 'y'
-    
+    print("Enter target edit duration in seconds (default 10): ")
     dur_input = input("Enter target edit duration in seconds (default 10): ").strip()
     try:
         target_duration = float(dur_input) if dur_input else 10.0
