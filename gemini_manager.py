@@ -310,8 +310,8 @@ class GeminiAPIManager:
             # 503 Service Unavailable / High Demand (Model level failure)
             if "503" in error_msg or "high demand" in error_msg.lower():
                 logger.warning(f"🚨 Model {model_name} is under high demand. Rotating model globally.")
-                # Ban the model globally for 3 minutes to let demand spike pass
-                self.model_cooldowns[model_name] = datetime.now() + timedelta(minutes=3)
+                # Ban the model globally for just 5 seconds as overloads are extremely temporary
+                self.model_cooldowns[model_name] = datetime.now() + timedelta(seconds=5)
                 # Also penalize the key slightly
                 key_status.status = ModelStatus.RATE_LIMITED
                 key_status.banned_until = datetime.now() + timedelta(seconds=30)
