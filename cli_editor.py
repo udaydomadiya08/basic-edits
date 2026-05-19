@@ -76,22 +76,23 @@ class AIVideoEditor:
         STRICT AUDIT: You are a professional video editor. 
         TOPIC: '{topic}'
         
-        CRITICAL METADATA AUDIT INSTRUCTION:
-        Carefully audit both the 'Title' and 'Desc' (Description) in the Metadata List for each candidate index.
-        Determine if the actual, authentic core subject of '{topic}' is the primary focus of the image.
-        If the Title or Description contains ANY of the following indicators, you MUST DISCARD it (do NOT include its index in the returned list):
-        1. Any reference indicating it is a parody, cartoon, fan-art, sketch, drawing, illustration, caricature, or concept art.
-        2. Any reference indicating a different entity (e.g. an animal, cartoon character, pop star, or other person) is dressed up as, mimicking, or portraying the subject.
-        3. Any reference to a related event, concept, metonymy, or poster rather than the authentic subject itself.
-        4. Any reference indicating a different person/object sharing a similar name.
-        5. Any indicators of text overlay, logo, watermark, diagram, infographic, or graph.
+        DYNAMIC SUBJECT DETERMINATION:
+        First, determine if the topic is:
+        - TYPE A (A specific, unique entity/person/character/masterpiece, e.g. 'Mona Lisa', 'The Weeknd', 'Elon Musk').
+        - TYPE B (A general concept, theme, vibe, or category, e.g. 'environment', 'cyberpunk', 'nature', 'love', 'technology').
         
-        ZERO TOLERANCE: You must be 100% certain from the metadata that it is the exact, authentic topic itself. If there is even a minor doubt or a stylistic deviation, DISCARD IT.
+        AUDITING INSTRUCTIONS:
+        - For TYPE A (Specific Entity): You must enforce an absolute Zero-Tolerance rule. Discard all fan-art, cartoons, parodies, caricatures, or different entities portraying the subject. Only accept the authentic, classic subject itself.
+        - For TYPE B (General Concept/Vibe): You must accept high-quality, professional, and cinematic images that visually and conceptually represent or match the theme/vibe of the topic '{topic}' (e.g. green nature, forests, eco-cities, or environmental concepts for 'environment'). Discard only things that are completely off-topic, messy, ugly, or irrelevant.
+        
+        CRITICAL METADATA AUDIT:
+        Scan both the 'Title' and 'Desc' (Description) for each candidate index.
+        Ensure you discard any candidates that are infographics, book covers, news event posters, diagrams, or have prominent text/watermark overlays.
         
         Metadata List:
         {chr(10).join(metadata_list)}
         
-        Return a JSON list of indices that are 100% ACCURATE and STRICTLY the authentic topic.
+        Return a JSON list of indices that are 100% ACCURATE and strictly fit the audited subject type.
         Example: [0, 2, 5]
         STRICT: Do not provide any explanation, chat, or additional text. Only the JSON list.
         """
@@ -180,13 +181,38 @@ class AIVideoEditor:
             attempts += 1
             print(f"🔍 Search Attempt {attempts} (Style: {style}, Got: {len(all_paths)}/{count})...")
             
-            # Query Google Images as primary, DuckDuckGo & Yahoo as secondary fallbacks
+            # Universal Super-Scraper Pipeline (queries Pexels, Bing, Google, DuckDuckGo, Yahoo for maximum coverage)
             main_query = f"\"{topic}\" {style} vertical portrait photo -text -logo -watermark -news -diagram -infographic"
-            print(f"🔍 Scraping Google Images (Primary) & DDG/Yahoo for '{style}' style...")
-            candidates = self.scraper.search_google(main_query, 80)
-            if len(candidates) < 15:
-                candidates += self.scraper.search_duckduckgo(main_query, 80)
-                candidates += self.scraper.search_yahoo(main_query, 60)
+            stock_query = f"{topic} {style}".replace('"', '')
+            
+            print(f"🔍 Multi-Scraping Pexels, Bing, Google, DDG & Yahoo for '{style}' style...")
+            candidates = []
+            
+            # 1. Pexels (premium stock photos)
+            try:
+                candidates += self.scraper.search_pexels(stock_query, 40)
+            except Exception as e:
+                logger.warning(f"Pexels error: {e}")
+                
+            # 2. Bing Images (highly reliable search results)
+            try:
+                candidates += self.scraper.search_bing(main_query, 60)
+            except Exception as e:
+                logger.warning(f"Bing error: {e}")
+                
+            # 3. Google Images
+            try:
+                candidates += self.scraper.search_google(main_query, 60)
+            except Exception as e:
+                logger.warning(f"Google error: {e}")
+                
+            # 4. DuckDuckGo & Yahoo
+            if len(candidates) < 20:
+                try:
+                    candidates += self.scraper.search_duckduckgo(main_query, 60)
+                    candidates += self.scraper.search_yahoo(main_query, 40)
+                except Exception as e:
+                    logger.warning(f"DDG/Yahoo error: {e}")
             
             # Shuffle scraped candidates list to ensure a unique selection of images is filtered and downloaded
             random.shuffle(candidates)
