@@ -119,11 +119,11 @@ class AIVideoEditor:
         attempts = 0
         
         styles = [
-            "crystal clear hyper-realistic",
-            "moody atmospheric lighting",
-            "golden hour cinematic photography",
-            "ultra-wide angle landscape",
-            "macro photography 8k"
+            "vertical wallpaper",
+            "aesthetic vertical art",
+            "cinematic vertical portrait",
+            "dynamic lockscreen vertical art",
+            "concept digital art vertical"
         ]
         # Shuffle visual styles list on every run to query completely different aesthetics first
         random.shuffle(styles)

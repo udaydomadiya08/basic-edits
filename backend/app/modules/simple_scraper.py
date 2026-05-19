@@ -23,8 +23,8 @@ class SimpleScraper:
         logger.info(message)
 
     def search_bing(self, query, limit, offset_start=1):
-        # Add negative keywords to avoid news/event noise
-        query += " -news -event -day -india -monsoon -temple -poster"
+        # Add negative keywords to avoid news/event/text noise
+        query += " -news -event -text -logo -watermark"
         self.log(f"Bing search for '{query}' (Offset: {offset_start})...")
         
         blacklist = ["thehindu.com", "starofmysore.com", "prokerala.com", "pinterest.com", "shutterstock.com", "istockphoto.com", "whatshot.in"]
@@ -65,8 +65,8 @@ class SimpleScraper:
         return results
 
     def search_duckduckgo(self, query, limit):
-        # Add negative keywords
-        query += " -news -event -day -india -monsoon -temple -poster"
+        # Add negative keywords to avoid news/event/text noise
+        query += " -news -event -text -logo -watermark"
         self.log(f"DDG search for '{query}'...")
         
         blacklist = ["thehindu.com", "starofmysore.com", "prokerala.com", "pinterest.com", "shutterstock.com", "istockphoto.com", "whatshot.in"]
