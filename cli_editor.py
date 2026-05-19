@@ -36,6 +36,23 @@ class AIVideoEditor:
         files = [f for f in os.listdir(self.music_dir) if f.endswith(('.mp3', '.wav'))]
         return sorted(files)
 
+    async def get_autocorrected_topic(self, topic: str) -> str:
+        """Correct typos in user input topic using the LLM Router before querying search engines"""
+        prompt = (
+            f"You are a search query optimizer. Correct any typos or spelling mistakes in the following search topic "
+            f"and return ONLY the official, correctly spelled name. Do not explain, do not add quotes, just return the name.\n"
+            f"Topic: {topic}\n"
+            f"Corrected Name:"
+        )
+        try:
+            res = await self.router.get_response(prompt, category="text")
+            corrected = res.get("content", "").strip()
+            if corrected and len(corrected) < 50:
+                return corrected
+        except Exception:
+            pass
+        return topic
+
     async def get_hook_phrase(self, topic):
         prompt = f"Create a short, hype building phrase for a video edit about '{topic}'. Maximum 5-7 words. Make it sound cool and mysterious, like a 'Fictic' or 'Eagle Stan' edit hook. Return ONLY the phrase."
         response = await self.router.get_response(prompt)
@@ -308,6 +325,11 @@ async def main():
     except: return
     topic = input("Enter topic: ")
     if not topic: return
+    
+    corrected_topic = await editor.get_autocorrected_topic(topic)
+    if corrected_topic.lower() != topic.lower():
+        print(f"🪄 Autocorrected search term: '{topic}' ➔ '{corrected_topic}'")
+        topic = corrected_topic
     
     use_hook = input("Include introductory hook/title phase? (y/N): ").strip().lower() == 'y'
     
