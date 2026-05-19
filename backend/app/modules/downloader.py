@@ -53,9 +53,9 @@ class ImageDownloader:
                             print(f"⚠️ Skipping tiny image ({width}x{height}) from {url}")
                             return None
                             
-                        # Strict vertical aspect ratio check (Height must be strictly greater than width)
-                        if width >= height:
-                            print(f"⚠️ Skipping non-vertical image ({width}x{height}) from {url}")
+                        # Relaxed check: Only skip extremely wide panoramic images, allowing normal horizontal/square images to be center-cropped
+                        if width > 2.2 * height:
+                            print(f"⚠️ Skipping extremely wide panoramic image ({width}x{height}) from {url}")
                             return None
 
                         # Convert to RGB and save as High-Quality JPEG for 100% MoviePy compatibility
