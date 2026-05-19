@@ -40,10 +40,11 @@ class AIVideoEditor:
         """Correct typos and resolve ambiguous entities in user input using LLM Router with optional song context"""
         song_context = f"\nVideo Music Track: {song_name}" if song_name else ""
         prompt = (
-            f"You are an expert AI search query optimizer. Given a user input search topic, identify the core celebrity, "
-            f"character, or entity they are looking for. Resolve any typos, spelling mistakes, or ambiguous descriptions "
-            f"(e.g., if they write 'weekend pop artist' or 'weekend', and the music track is by 'The Weeknd', resolve it to 'The Weeknd'). "
-            f"Return ONLY the official, correctly spelled entity name. Do not explain, do not add quotes, just return the name.{song_context}\n"
+            f"You are an expert AI search query optimizer. Given a user input search topic, identify the core subject, "
+            f"entity, concept, or character they are looking for. Resolve any typos, spelling mistakes, or ambiguous/messy "
+            f"descriptions (e.g., if they write a descriptive query, resolve it to the most clean, standard, and official name of that subject). "
+            f"If a music track context is provided, use it to intelligently resolve any contextual ambiguities in the topic.\n"
+            f"Return ONLY the official, correctly spelled name of the core subject. Do not explain, do not add quotes, just return the name.{song_context}\n"
             f"Topic: {topic}\n"
             f"Corrected Name:"
         )
