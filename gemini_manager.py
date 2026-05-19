@@ -117,50 +117,6 @@ class GeminiAPIManager:
                     rate_limit=RateLimit(rpm=100, tpm=30000, rpd=1000),
                     performance_score=7.5,
                     cost_efficiency=8.5
-                ),
-                
-                # Other models - Lowest priority
-                "gemma-3-1b": ModelConfig(
-                    name="gemma-3-1b",
-                    category="fallback",
-                    rate_limit=RateLimit(rpm=30, tpm=15000, rpd=14400),
-                    performance_score=6.0,
-                    cost_efficiency=9.0
-                ),
-                "gemma-3-4b": ModelConfig(
-                    name="gemma-3-4b", 
-                    category="fallback",
-                    rate_limit=RateLimit(rpm=30, tpm=15000, rpd=14400),
-                    performance_score=7.0,
-                    cost_efficiency=8.5
-                ),
-                "gemma-4-12b": ModelConfig(
-                    name="gemma-4-12b",
-                    category="fallback",
-                    rate_limit=RateLimit(rpm=30, tpm=15000, rpd=14400),
-                    performance_score=8.0,
-                    cost_efficiency=9.0
-                ),
-                "gemma-4-26b": ModelConfig(
-                    name="gemma-4-26b",
-                    category="fallback",
-                    rate_limit=RateLimit(rpm=15, tpm=999999, rpd=1500),
-                    performance_score=8.5,
-                    cost_efficiency=6.5
-                ),
-                "gemma-2-27b": ModelConfig(
-                    name="gemma-2-27b",
-                    category="fallback",
-                    rate_limit=RateLimit(rpm=30, tpm=15000, rpd=14400),
-                    performance_score=8.7,
-                    cost_efficiency=8.5
-                ),
-                "gemma-4-31b": ModelConfig(
-                    name="gemma-4-31b",
-                    category="fallback",
-                    rate_limit=RateLimit(rpm=15, tpm=999999, rpd=1500),
-                    performance_score=9.2,
-                    cost_efficiency=6.0
                 )
             }
             

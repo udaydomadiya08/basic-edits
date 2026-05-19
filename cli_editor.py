@@ -78,16 +78,21 @@ class AIVideoEditor:
         
         DYNAMIC SUBJECT DETERMINATION:
         First, determine if the topic is:
-        - TYPE A (A specific, unique entity/person/character/masterpiece, e.g. 'Mona Lisa', 'The Weeknd', 'Elon Musk').
+        - TYPE A (A specific, unique entity/person/character/masterpiece, e.g. 'Mona Lisa', 'The Weeknd', 'Elon Musk', 'Jethalal').
         - TYPE B (A general concept, theme, vibe, or category, e.g. 'environment', 'cyberpunk', 'nature', 'love', 'technology').
         
         AUDITING INSTRUCTIONS:
-        - For TYPE A (Specific Entity): You must enforce an absolute Zero-Tolerance rule. Discard all fan-art, cartoons, parodies, caricatures, or different entities portraying the subject. Only accept the authentic, classic subject itself.
-        - For TYPE B (General Concept/Vibe): You must accept high-quality, professional, and cinematic images that visually and conceptually represent or match the theme/vibe of the topic '{topic}' (e.g. green nature, forests, eco-cities, or environmental concepts for 'environment'). Discard only things that are completely off-topic, messy, ugly, or irrelevant.
+        - For TYPE A (Specific Entity): You must enforce an absolute Zero-Tolerance rule. Only accept the authentic, classic subject/character itself. You MUST DISCARD any fan-art, cartoons, parodies, or caricature versions. 
+        - For TYPE B (General Concept/Vibe): You must accept high-quality, professional, and cinematic images that visually and conceptually represent or match the theme/vibe of the topic '{topic}'. Discard only things that are completely off-topic, messy, ugly, or irrelevant.
         
-        CRITICAL METADATA AUDIT:
+        CRITICAL NO-LEAK METADATA AUDIT:
         Scan both the 'Title' and 'Desc' (Description) for each candidate index.
-        Ensure you discard any candidates that are infographics, book covers, news event posters, diagrams, or have prominent text/watermark overlays.
+        You MUST DISCARD any candidates that are:
+        1. Paparazzi photos, press event groups, party crowds, or red carpet bashes featuring multiple actors/people or success parties.
+        2. Book covers, news article screenshots, blogs, generators, reviews, text overlay lists, infographics, diagrams, or charts.
+        3. Prominent text overlays, logos, or watermarks.
+        
+        The approved candidate must be a clean, aesthetic, single-subject portrait, artwork, wallpaper, or icon representing the core topic '{topic}' beautifully.
         
         Metadata List:
         {chr(10).join(metadata_list)}
@@ -145,7 +150,9 @@ class AIVideoEditor:
             
         negative_words = {
             "infographic", "diagram", "news", "event", "poster", "chart", "map", 
-            "parody", "cartoon", "caricature", "illustration", "sketch", "drawing"
+            "parody", "cartoon", "caricature", "illustration", "sketch", "drawing",
+            "press", "bash", "success party", "red carpet", "paparazzi", "screenshot",
+            "blog", "article", "generator", "best ai", "top 10", "how to"
         }
         
         for res in results:
@@ -156,9 +163,16 @@ class AIVideoEditor:
             if any(w in title or w in desc for w in negative_words):
                 continue
                 
-            # Check if any important keyword of the topic is present in title or desc to guarantee strict relevance
-            if any(w in title or w in desc for w in important_words):
-                valid_urls.append(res["url"])
+            # If multi-word topic (e.g. "Romeo Montague", "The Weeknd"), require ALL keywords to match
+            # to guarantee 100% strict relevance and avoid single-word generic false positives.
+            if len(important_words) > 1:
+                if not all(w in title or w in desc for w in important_words):
+                    continue
+            else:
+                if not any(w in title or w in desc for w in important_words):
+                    continue
+                    
+            valid_urls.append(res["url"])
                 
         return valid_urls
 
