@@ -76,13 +76,15 @@ class AIVideoEditor:
         3. Identify 'positive_keywords' that MUST appear in candidate titles or descriptions to prove it is actually about this subject (e.g. ['jalebi', 'sweet'] for 'jalebi'; ['weeknd', 'starboy'] for 'The Weeknd').
         4. Identify 'negative_keywords' representing irrelevant contexts, parodies, press event spam, blog/generator screenshots, reviews, or other off-topic contexts that must be rejected.
         
-        Return ONLY a raw, clean JSON object matching this schema:
+        Return ONLY a raw, clean JSON object matching this schema.
+        Example output for topic 'Elon Musk':
         {{
-          "core_subject": "...",
+          "core_subject": "Elon Musk",
           "is_real_person": true,
-          "positive_keywords": ["word1", "word2", ...],
-          "negative_keywords": ["word1", "word2", ...]
+          "positive_keywords": ["elon", "musk", "tesla", "spacex"],
+          "negative_keywords": ["infographic", "screenshot", "meme", "parody", "cartoon", "caricature"]
         }}
+        
         STRICT: Do not provide any markdown, no explanation, no backticks, just the JSON string.
         """
         
@@ -101,8 +103,30 @@ class AIVideoEditor:
                 if content.startswith("```"):
                     content = re.sub(r"^```[a-zA-Z]*\n", "", content)
                     content = re.sub(r"\n```$", "", content)
-                parsed = json.loads(content)
-                if isinstance(parsed, dict):
+                
+                parsed = None
+                try:
+                    parsed = json.loads(content)
+                except Exception as je:
+                    logger.warning(f"Standard JSON parsing failed, attempting regex extraction: {je}")
+                    # Robust case-insensitive regex fallbacks to parse even broken/truncated JSON output gracefully
+                    subject_m = re.search(r'"core_subject"\s*:\s*"([^"]+)"', content)
+                    person_m = re.search(r'"is_real_person"\s*:\s*(true|false|"[^"]+")', content, re.IGNORECASE)
+                    pos_m = re.search(r'"positive_keywords"\s*:\s*\[([^\]]*)\]', content)
+                    neg_m = re.search(r'"negative_keywords"\s*:\s*\[([^\]]*)\]', content)
+                    
+                    parsed = {}
+                    if subject_m:
+                        parsed["core_subject"] = subject_m.group(1)
+                    if person_m:
+                        val = person_m.group(1).lower().strip('"')
+                        parsed["is_real_person"] = (val == 'true')
+                    if pos_m:
+                        parsed["positive_keywords"] = [w.strip().strip('"').strip("'") for w in pos_m.group(1).split(",") if w.strip()]
+                    if neg_m:
+                        parsed["negative_keywords"] = [w.strip().strip('"').strip("'") for w in neg_m.group(1).split(",") if w.strip()]
+                
+                if parsed:
                     spec["core_subject"] = parsed.get("core_subject", topic)
                     spec["is_real_person"] = bool(parsed.get("is_real_person", False))
                     spec["positive_keywords"] = [w.lower() for w in parsed.get("positive_keywords", []) if len(w) > 1]
