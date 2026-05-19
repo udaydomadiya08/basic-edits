@@ -32,7 +32,7 @@ class SimpleScraper:
         try:
             offset = offset_start
             while len(results) < limit and offset < offset_start + limit * 6:
-                url = f"https://www.bing.com/images/search?q={query}&first={offset}"
+                url = f"https://www.bing.com/images/search?q={query}&first={offset}&adlt=off"
                 res = requests.get(url, headers=self.headers, timeout=10)
                 soup = BeautifulSoup(res.text, 'html.parser')
                 
@@ -72,11 +72,11 @@ class SimpleScraper:
         blacklist = ["thehindu.com", "starofmysore.com", "prokerala.com", "pinterest.com", "shutterstock.com", "istockphoto.com", "whatshot.in"]
         results = []
         try:
-            res = requests.get(f"https://duckduckgo.com/?q={query}", headers=self.headers)
+            res = requests.get(f"https://duckduckgo.com/?q={query}&kp=-2", headers=self.headers)
             vqd_match = re.search(r"vqd='([^']+)'", res.text) or re.search(r'vqd="([^"]+)"', res.text)
             if vqd_match:
                 vqd = vqd_match.group(1)
-                url = f"https://duckduckgo.com/i.js?l=us-en&o=json&q={query}&vqd={vqd}"
+                url = f"https://duckduckgo.com/i.js?l=us-en&o=json&q={query}&vqd={vqd}&p=-1&kp=-2"
                 res = requests.get(url, headers=self.headers, timeout=10)
                 data = res.json()
                 for result in data.get("results", []):
@@ -116,7 +116,7 @@ class SimpleScraper:
         self.log(f"Yahoo search for '{query}'...")
         results = []
         try:
-            url = f"https://images.search.yahoo.com/search/images?p={query}"
+            url = f"https://images.search.yahoo.com/search/images?p={query}&vm=off"
             res = requests.get(url, headers=self.headers, timeout=10)
             soup = BeautifulSoup(res.text, 'html.parser')
             items = soup.find_all("li", class_="ld")
@@ -151,7 +151,7 @@ class SimpleScraper:
                     "Accept-Language": "en-US,en;q=0.5",
                     "Referer": "https://www.google.com/"
                 }
-                url = f"https://www.google.com/search?q={query}&tbm=isch"
+                url = f"https://www.google.com/search?q={query}&tbm=isch&safe=off"
                 res = requests.get(url, headers=headers, cookies={"CONSENT": "YES+"}, timeout=10)
                 self.log(f"Google status: {res.status_code} | Length: {len(res.text)} | Agent: {ua[:30]}...")
                 
