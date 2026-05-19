@@ -77,8 +77,9 @@ class AIVideoEditor:
         TOPIC: '{topic}'
         
         ZERO TOLERANCE RULE: 
-        If the image is not EXACTLY and DIRECTLY related to '{topic}', discard it. 
-        If it deviates even slightly (e.g., a related event, a conceptual metaphor, or a different object in the same category), DISCARD IT.
+        1. If the image is a cartoon, fan-art, parody, caricature, sketch, drawing, animal dressed up as the subject, or a different person/object sharing a similar name, DISCARD IT. (E.g. if topic is 'Mona Lisa', only accept the classic Leonardo da Vinci masterpiece portrait. Discard TMNT cartoon characters, raccoon caricatures, pop singers, and modern parody paintings).
+        2. If the image is not EXACTLY and DIRECTLY related to the core authentic subject '{topic}', discard it. 
+        3. If it deviates even slightly (e.g., a related event, a conceptual metaphor, or a different object in the same category), DISCARD IT.
         
         IMMEDIATELY DISCARD:
         1. Anything that isn't the EXACT subject of '{topic}'.
@@ -107,6 +108,12 @@ class AIVideoEditor:
                     clean_content = re.sub(r"\n```$", "", clean_content)
                 clean_content = clean_content.strip()
                 
+                # Auto-heal truncated JSON arrays if they start with [ but lack a closing ]
+                if '[' in clean_content and ']' not in clean_content:
+                    clean_content = re.sub(r'[^0-9,\s]*$', '', clean_content).strip()
+                    clean_content = re.sub(r',\s*$', '', clean_content)
+                    clean_content += ']'
+                
                 # Find JSON array boundaries
                 start_idx = clean_content.find('[')
                 end_idx = clean_content.rfind(']')
@@ -134,7 +141,11 @@ class AIVideoEditor:
         if not important_words:
             important_words = [w for w in topic.lower().split() if len(w) > 1]
             
-        negative_words = {"infographic", "diagram", "news", "event", "poster", "chart", "map"}
+        negative_words = {
+            "infographic", "diagram", "news", "event", "poster", "chart", "map", 
+            "parody", "cartoon", "caricature", "illustration", "sketch", "drawing", 
+            "raccoon", "animal", "tmnt", "turtle", "j-hope", "jhope"
+        }
         
         for res in results:
             title = res.get("title", "").lower()
