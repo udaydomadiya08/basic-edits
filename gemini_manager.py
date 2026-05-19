@@ -79,33 +79,12 @@ class GeminiAPIManager:
                     performance_score=10.0,
                     cost_efficiency=9.9
                 ),
-                "gemini-1.5-flash": ModelConfig(
-                    name="gemini-1.5-flash",
-                    category="text",
-                    rate_limit=RateLimit(rpm=15, tpm=1000000, rpd=1500),
-                    performance_score=9.8,
-                    cost_efficiency=9.5
-                ),
                 "gemini-2.0-flash": ModelConfig(
                     name="gemini-2.0-flash",
                     category="text",
                     rate_limit=RateLimit(rpm=15, tpm=1000000, rpd=1500),
                     performance_score=9.5,
                     cost_efficiency=9.5
-                ),
-                "gemini-3.1-flash": ModelConfig(
-                    name="gemini-3.1-flash",
-                    category="text",
-                    rate_limit=RateLimit(rpm=15, tpm=1000000, rpd=1500),
-                    performance_score=9.0,
-                    cost_efficiency=9.9
-                ),
-                "gemini-1.5-pro": ModelConfig(
-                    name="gemini-1.5-pro",
-                    category="text",
-                    rate_limit=RateLimit(rpm=5, tpm=500000, rpd=360),
-                    performance_score=9.0,
-                    cost_efficiency=8.0
                 ),
                 
                 # TTS models - Medium priority

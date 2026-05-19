@@ -8,6 +8,7 @@ from PIL import Image
 import io
 import cv2
 import numpy as np
+import yarl
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,9 @@ class ImageDownloader:
                     "Referer": "https://www.google.com/",
                     "DNT": "1"
                 }
-                async with session.get(url, timeout=15, headers=headers) as response:
+                # Prevent aiohttp from double-encoding pre-encoded URLs (which causes Wikipedia Status 400)
+                yarl_url = yarl.URL(url, encoded=True)
+                async with session.get(yarl_url, timeout=15, headers=headers) as response:
                     if response.status == 200:
                         content = await response.read()
                         
