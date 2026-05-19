@@ -77,7 +77,7 @@ class AIVideoEditor:
         TOPIC: '{topic}'
         
         ZERO TOLERANCE RULE: 
-        1. If the image is a cartoon, fan-art, parody, caricature, sketch, drawing, animal dressed up as the subject, or a different person/object sharing a similar name, DISCARD IT. (E.g. if topic is 'Mona Lisa', only accept the classic Leonardo da Vinci masterpiece portrait. Discard TMNT cartoon characters, raccoon caricatures, pop singers, and modern parody paintings).
+        1. If the image is a cartoon, fan-art, parody, caricature, sketch, drawing, animal dressed up as the subject, or a different person/object sharing a similar name, DISCARD IT. You must only accept the authentic, classic subject itself. Discard all cartoon versions, caricatures of animals dressed up, pop singers/celebrities posing, or modern parody representations of the topic unless the topic itself explicitly requests it.
         2. If the image is not EXACTLY and DIRECTLY related to the core authentic subject '{topic}', discard it. 
         3. If it deviates even slightly (e.g., a related event, a conceptual metaphor, or a different object in the same category), DISCARD IT.
         
@@ -143,8 +143,7 @@ class AIVideoEditor:
             
         negative_words = {
             "infographic", "diagram", "news", "event", "poster", "chart", "map", 
-            "parody", "cartoon", "caricature", "illustration", "sketch", "drawing", 
-            "raccoon", "animal", "tmnt", "turtle", "j-hope", "jhope"
+            "parody", "cartoon", "caricature", "illustration", "sketch", "drawing"
         }
         
         for res in results:
