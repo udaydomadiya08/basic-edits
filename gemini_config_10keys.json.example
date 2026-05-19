@@ -1,0 +1,49 @@
+{
+  "preferred_provider": "gemini",
+  "api_keys": [
+    {
+      "key": "YOUR_GEMINI_API_KEY_1",
+      "name": "Primary Key",
+      "priority": 1,
+      "project": "alpha",
+      "daily_limit_buffer": 0.9
+    },
+    {
+      "key": "YOUR_GEMINI_API_KEY_2",
+      "name": "Secondary Key",
+      "priority": 2,
+      "project": "beta",
+      "daily_limit_buffer": 0.9
+    }
+  ],
+  "groq_api_key": "YOUR_GROQ_API_KEY",
+  "groq_model": "llama-3.3-70b-versatile",
+  "ollama_base_url": "http://localhost:11434",
+  "ollama_model": "llama3.1",
+  "system_settings": {
+    "timeout": 15,
+    "max_retries": 3,
+    "enable_fallback_to_groq": true,
+    "log_api_calls": true,
+    "health_check_interval": 300,
+    "key_rotation_strategy": "round_robin_with_health",
+    "emergency_fallback_threshold": 2
+  },
+  "model_preferences": {
+    "text": [
+      "gemini-2.0-flash",
+      "gemini-1.5-flash",
+      "gemini-1.5-pro"
+    ]
+  },
+  "rate_limit_strategy": {
+    "conservative_mode": true,
+    "daily_usage_cap_percentage": 85,
+    "minute_usage_cap_percentage": 80,
+    "burst_protection": true,
+    "adaptive_throttling": true
+  },
+  "nvidia_api_key": "YOUR_NVIDIA_API_KEY",
+  "nvidia_model": "meta/llama-3.1-405b-instruct",
+  "nvidia_base_url": "https://integrate.api.nvidia.com/v1"
+}

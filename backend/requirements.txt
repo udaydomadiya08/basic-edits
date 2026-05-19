@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+python-multipart
+beautifulsoup4
+requests
+aiohttp
+aiofiles
+pillow
+opencv-python
+numpy
+pydantic
+pydantic-settings

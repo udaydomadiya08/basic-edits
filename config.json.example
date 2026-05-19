@@ -1,0 +1,13 @@
+{
+  "privacy_mode": true,
+  "groq_api_key": "YOUR_GROQ_API_KEY",
+  "ollama_model": "llama3.1",
+  "db_name": "database.db",
+  "use_llm": true,
+  "gemini_enabled": true,
+  "llm_router_enabled": true,
+  "preferred_provider": "gemini",
+  "nvidia_api_key": "YOUR_NVIDIA_API_KEY",
+  "nvidia_model": "meta/llama-3.1-405b-instruct",
+  "nvidia_base_url": "https://integrate.api.nvidia.com/v1"
+}

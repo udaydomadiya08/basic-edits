@@ -1,0 +1,133 @@
+import requests
+from bs4 import BeautifulSoup
+import json
+import logging
+import re
+import random
+
+logger = logging.getLogger(__name__)
+
+class SimpleScraper:
+    def __init__(self, log_callback=None):
+        self.log_callback = log_callback
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Referer": "https://www.google.com/"
+        }
+
+    def log(self, message):
+        if self.log_callback:
+            self.log_callback(message)
+        logger.info(message)
+
+    def search_bing(self, query, limit, offset_start=1):
+        # Add negative keywords to avoid news/event noise
+        query += " -news -event -day -india -monsoon -temple -poster"
+        self.log(f"Bing search for '{query}' (Offset: {offset_start})...")
+        
+        blacklist = ["thehindu.com", "starofmysore.com", "prokerala.com", "pinterest.com", "shutterstock.com", "istockphoto.com", "whatshot.in"]
+        results = []
+        try:
+            offset = offset_start
+            while len(results) < limit and offset < offset_start + limit * 6:
+                url = f"https://www.bing.com/images/search?q={query}&first={offset}"
+                res = requests.get(url, headers=self.headers, timeout=10)
+                soup = BeautifulSoup(res.text, 'html.parser')
+                
+                links = soup.find_all("a", class_="iusc")
+                if not links: break
+                
+                for link in links:
+                    if len(results) >= limit: break
+                    m = link.get("m")
+                    if m:
+                        try:
+                            m_data = json.loads(m)
+                            murl = m_data.get("murl")
+                            if murl:
+                                # Blacklist Check
+                                if any(domain in murl.lower() for domain in blacklist):
+                                    continue
+                                    
+                                results.append({
+                                    "url": murl,
+                                    "title": m_data.get("t", ""),
+                                    "description": m_data.get("s", "")
+                                })
+                        except: continue
+                
+                offset += len(links)
+                if offset > offset_start + 300: break
+        except Exception as e:
+            self.log(f"Bing error: {e}")
+        return results
+
+    def search_duckduckgo(self, query, limit):
+        # Add negative keywords
+        query += " -news -event -day -india -monsoon -temple -poster"
+        self.log(f"DDG search for '{query}'...")
+        
+        blacklist = ["thehindu.com", "starofmysore.com", "prokerala.com", "pinterest.com", "shutterstock.com", "istockphoto.com", "whatshot.in"]
+        results = []
+        try:
+            res = requests.get(f"https://duckduckgo.com/?q={query}", headers=self.headers)
+            vqd_match = re.search(r"vqd='([^']+)'", res.text) or re.search(r'vqd="([^"]+)"', res.text)
+            if vqd_match:
+                vqd = vqd_match.group(1)
+                url = f"https://duckduckgo.com/i.js?l=us-en&o=json&q={query}&vqd={vqd}"
+                res = requests.get(url, headers=self.headers, timeout=10)
+                data = res.json()
+                for result in data.get("results", []):
+                    if len(results) >= limit: break
+                    img_url = result.get("image")
+                    if img_url:
+                        # Blacklist Check
+                        if any(domain in img_url.lower() for domain in blacklist):
+                            continue
+                            
+                        results.append({
+                            "url": img_url,
+                            "title": result.get("title", ""),
+                            "description": ""
+                        })
+        except Exception as e:
+            self.log(f"DDG error: {e}")
+        return results
+
+    def search_pexels(self, query, limit):
+        self.log(f"Pexels search for '{query}'...")
+        results = []
+        try:
+            url = f"https://www.pexels.com/search/{query}/"
+            res = requests.get(url, headers=self.headers, timeout=10)
+            soup = BeautifulSoup(res.text, 'html.parser')
+            imgs = soup.find_all("img")
+            for img in imgs:
+                if len(results) >= limit: break
+                src = img.get("src")
+                if src and "images.pexels.com" in src:
+                    results.append({"url": src, "title": img.get("alt", ""), "description": ""})
+        except: pass
+        return results
+
+    def search_yahoo(self, query, limit):
+        self.log(f"Yahoo search for '{query}'...")
+        results = []
+        try:
+            url = f"https://images.search.yahoo.com/search/images?p={query}"
+            res = requests.get(url, headers=self.headers, timeout=10)
+            soup = BeautifulSoup(res.text, 'html.parser')
+            items = soup.find_all("li", class_="ld")
+            for item in items:
+                if len(results) >= limit: break
+                data = item.get("data")
+                if data:
+                    try:
+                        m_data = json.loads(data)
+                        iurl = m_data.get("iurl")
+                        if iurl: results.append({"url": iurl, "title": m_data.get("alt", ""), "description": ""})
+                    except: continue
+        except: pass
+        return results
