@@ -92,7 +92,27 @@ class AIVideoEditor:
             except Exception as e:
                 logger.warning(f"AI Filter parse error: {e}")
         
-        return [res['url'] for res in results]
+        return []
+
+    def filter_results_locally(self, topic, results):
+        """Ultra-resilient local fallback filter using strict keyword matching"""
+        valid_urls = []
+        topic_words = set(topic.lower().split())
+        negative_words = {"infographic", "diagram", "news", "event", "poster", "chart", "map"}
+        
+        for res in results:
+            title = res.get("title", "").lower()
+            desc = res.get("description", "").lower()
+            
+            # Check negative words
+            if any(w in title or w in desc for w in negative_words):
+                continue
+                
+            # Check if any word of the topic is present in title or desc to guarantee strict relevance
+            if any(w in title or w in desc for w in topic_words):
+                valid_urls.append(res["url"])
+                
+        return valid_urls
 
     async def fetch_images(self, topic, count=15):
         all_paths = []
@@ -114,16 +134,22 @@ class AIVideoEditor:
             print(f"🔍 Search Attempt {attempts} (Style: {style}, Got: {len(all_paths)}/{count})...")
             
             # Use DuckDuckGo as primary, Yahoo as secondary
-            main_query = f"{topic} {style} portrait photography vertical mobile wallpaper cinematic"
+            # Construct highly restrictive, targeted queries
+            main_query = f"\"{topic}\" {style} vertical portrait photo -text -logo -watermark -news -diagram -infographic"
             print(f"🔍 Scraping DDG & Yahoo for '{style}' style...")
-            candidates = self.scraper.search_duckduckgo(main_query, 60)
-            candidates += self.scraper.search_yahoo(main_query, 40)
+            candidates = self.scraper.search_duckduckgo(main_query, 80)
+            candidates += self.scraper.search_yahoo(main_query, 60)
             
             # Shuffle scraped candidates list to ensure a unique selection of images is filtered and downloaded
             random.shuffle(candidates)
             
             # AI Filter
             verified_urls = await self.filter_results_with_ai(topic, candidates)
+            
+            # Resilient local fallback if AI filter failed or was rate-limited
+            if not verified_urls:
+                print("⚠️ AI Filter rate-limited or unavailable. Activating ultra-resilient local metadata filter...")
+                verified_urls = self.filter_results_locally(topic, candidates)
             
             # Download
             if verified_urls:

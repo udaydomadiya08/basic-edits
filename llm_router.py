@@ -25,6 +25,18 @@ class LLMRouter:
                 gemini_config_file = "gemini_config.json"
                 
         self.gemini_manager = GeminiAPIManager(config_path=gemini_config_file)
+        
+        # Merge credentials from main config.json if it exists and keys are missing
+        if os.path.exists("config.json"):
+            try:
+                with open("config.json", 'r') as f:
+                    main_config = json.load(f)
+                    for k, v in main_config.items():
+                        if k not in self.config or not self.config[k]:
+                            self.config[k] = v
+            except Exception as e:
+                logger.warning(f"Failed to merge config.json: {e}")
+                
         self.provider_rankings = {
             LLMProvider.NVIDIA: 1.0,  # Highest priority
             LLMProvider.GEMINI: 0.9,  # High performance fallback

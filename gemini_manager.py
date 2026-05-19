@@ -56,6 +56,7 @@ class GeminiAPIManager:
         self.key_health_scores: Dict[str, float] = {}
         self.last_health_check = datetime.now()
         self.model_cooldowns: Dict[str, datetime] = {}
+        self.key_unsupported_models: Dict[str, set] = {}
         self.load_config()
         
     def load_config(self):
@@ -75,21 +76,21 @@ class GeminiAPIManager:
                     name="gemini-2.0-flash",
                     category="text",
                     rate_limit=RateLimit(rpm=15, tpm=1000000, rpd=1500),
-                    performance_score=9.8,
-                    cost_efficiency=9.5
+                    performance_score=10.0,
+                    cost_efficiency=9.9
                 ),
                 "gemini-1.5-flash": ModelConfig(
                     name="gemini-1.5-flash",
                     category="text",
                     rate_limit=RateLimit(rpm=15, tpm=1000000, rpd=1500),
                     performance_score=9.5,
-                    cost_efficiency=9.9
+                    cost_efficiency=9.5
                 ),
                 "gemini-1.5-pro": ModelConfig(
                     name="gemini-1.5-pro",
                     category="text",
                     rate_limit=RateLimit(rpm=5, tpm=500000, rpd=360),
-                    performance_score=9.9,
+                    performance_score=9.6,
                     cost_efficiency=8.0
                 ),
                 
@@ -301,6 +302,13 @@ class GeminiAPIManager:
                 key_status.status = ModelStatus.RATE_LIMITED
                 key_status.banned_until = datetime.now() + timedelta(seconds=30)
                 
+            # 404 Model Not Found / Unsupported (Key-level model restriction)
+            elif "404" in error_msg or "not found" in error_msg.lower() or "not supported" in error_msg.lower():
+                logger.warning(f"🚫 Key {api_key[:10]}... does not support model {model_name}. Banning model for this key.")
+                if api_key not in self.key_unsupported_models:
+                    self.key_unsupported_models[api_key] = set()
+                self.key_unsupported_models[api_key].add(model_name)
+                
             # 429 Rate Limit (Key level failure)
             elif "429" in error_msg or "rate limit" in error_msg.lower():
                 if "daily" in error_msg.lower():
@@ -315,14 +323,16 @@ class GeminiAPIManager:
                 # General error, penalize health but don't ban yet
                 self.key_health_scores[api_key] = max(0, self.key_health_scores.get(api_key, 100) - 10)
     
-    def get_best_available_key_model(self, category: Optional[str] = None, estimated_tokens: int = 0) -> Tuple[Optional[str], Optional[str]]:
+    def get_best_available_key_model(self, category: Optional[str] = None, estimated_tokens: int = 0, target_model: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
         """Get the best available API key and model combination with health-based rotation"""
-        available_models = self.get_available_models(category)
-        
-        # If primary category is exhausted, append fallback models
-        if category and category != "fallback":
-            fallback_models = self.get_available_models("fallback")
-            available_models.extend([m for m in fallback_models if m not in available_models])
+        if target_model:
+            available_models = [target_model]
+        else:
+            available_models = self.get_available_models(category)
+            # If primary category is exhausted, append fallback models
+            if category and category != "fallback":
+                fallback_models = self.get_available_models("fallback")
+                available_models.extend([m for m in fallback_models if m not in available_models])
         
         if not available_models:
             return None, None
@@ -336,8 +346,14 @@ class GeminiAPIManager:
         
         # Try each model in priority order
         for model_name in available_models:
+            # Check if model is on global cooldown
+            if model_name in self.model_cooldowns and datetime.now() < self.model_cooldowns[model_name]:
+                continue
             # Try each API key by health score
             for api_key in healthy_keys:
+                # Check if model is unsupported by this specific key
+                if api_key in self.key_unsupported_models and model_name in self.key_unsupported_models[api_key]:
+                    continue
                 can_use, reason = self.check_rate_limits(api_key, model_name, estimated_tokens)
                 if can_use:
                     return api_key, model_name
@@ -349,12 +365,7 @@ class GeminiAPIManager:
         estimated_tokens = len(prompt.split()) * 4  # Rough estimate
         
         # If specific model requested, try it first
-        if model_name:
-            api_key, selected_model = self.get_best_available_key_model(category, estimated_tokens)
-            if selected_model != model_name:
-                logger.warning(f"Requested model {model_name} not available, using {selected_model}")
-        else:
-            api_key, selected_model = self.get_best_available_key_model(category, estimated_tokens)
+        api_key, selected_model = self.get_best_available_key_model(category, estimated_tokens, target_model=model_name)
             
         print(f"[TRACE] Gemini Manager Selected Model: {selected_model}")
         if not api_key or not selected_model:
