@@ -76,21 +76,22 @@ class AIVideoEditor:
         STRICT AUDIT: You are a professional video editor. 
         TOPIC: '{topic}'
         
-        ZERO TOLERANCE RULE: 
-        1. If the image is a cartoon, fan-art, parody, caricature, sketch, drawing, animal dressed up as the subject, or a different person/object sharing a similar name, DISCARD IT. You must only accept the authentic, classic subject itself. Discard all cartoon versions, caricatures of animals dressed up, pop singers/celebrities posing, or modern parody representations of the topic unless the topic itself explicitly requests it.
-        2. If the image is not EXACTLY and DIRECTLY related to the core authentic subject '{topic}', discard it. 
-        3. If it deviates even slightly (e.g., a related event, a conceptual metaphor, or a different object in the same category), DISCARD IT.
+        CRITICAL METADATA AUDIT INSTRUCTION:
+        Carefully audit both the 'Title' and 'Desc' (Description) in the Metadata List for each candidate index.
+        Determine if the actual, authentic core subject of '{topic}' is the primary focus of the image.
+        If the Title or Description contains ANY of the following indicators, you MUST DISCARD it (do NOT include its index in the returned list):
+        1. Any reference indicating it is a parody, cartoon, fan-art, sketch, drawing, illustration, caricature, or concept art.
+        2. Any reference indicating a different entity (e.g. an animal, cartoon character, pop star, or other person) is dressed up as, mimicking, or portraying the subject.
+        3. Any reference to a related event, concept, metonymy, or poster rather than the authentic subject itself.
+        4. Any reference indicating a different person/object sharing a similar name.
+        5. Any indicators of text overlay, logo, watermark, diagram, infographic, or graph.
         
-        IMMEDIATELY DISCARD:
-        1. Anything that isn't the EXACT subject of '{topic}'.
-        2. Any result mentioning "Day" (e.g., World Water Day), "News", "Event", or "Poster".
-        3. Any result that looks like an Infographic, Graph, or Diagram.
-        4. Any result containing text, logos, or watermarks.
+        ZERO TOLERANCE: You must be 100% certain from the metadata that it is the exact, authentic topic itself. If there is even a minor doubt or a stylistic deviation, DISCARD IT.
         
         Metadata List:
         {chr(10).join(metadata_list)}
         
-        Return a JSON list of indices that are 100% ACCURATE and CINEMATIC.
+        Return a JSON list of indices that are 100% ACCURATE and STRICTLY the authentic topic.
         Example: [0, 2, 5]
         STRICT: Do not provide any explanation, chat, or additional text. Only the JSON list.
         """
