@@ -152,7 +152,7 @@ class SimpleScraper:
                     "Referer": "https://www.google.com/"
                 }
                 url = f"https://www.google.com/search?q={query}&tbm=isch"
-                res = requests.get(url, headers=headers, timeout=10)
+                res = requests.get(url, headers=headers, cookies={"CONSENT": "YES+"}, timeout=10)
                 self.log(f"Google status: {res.status_code} | Length: {len(res.text)} | Agent: {ua[:30]}...")
                 
                 if res.status_code != 200:
