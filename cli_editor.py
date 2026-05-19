@@ -72,12 +72,14 @@ class AIVideoEditor:
         
         Generate a highly precise JSON specification for validating scraped image metadata.
         1. Identify the core subject/entity.
-        2. Identify 'positive_keywords' that MUST appear in candidate titles or descriptions to prove it is actually about this subject (e.g. ['jalebi', 'sweet'] for 'jalebi'; ['weeknd', 'starboy'] for 'The Weeknd').
-        3. Identify 'negative_keywords' representing irrelevant contexts, parodies, press event spam, blog/generator screenshots, reviews, or other off-topic contexts that must be rejected.
+        2. Determine if this subject is a real-life person, model, actor, singer, or celebrity (is_real_person: true/false).
+        3. Identify 'positive_keywords' that MUST appear in candidate titles or descriptions to prove it is actually about this subject (e.g. ['jalebi', 'sweet'] for 'jalebi'; ['weeknd', 'starboy'] for 'The Weeknd').
+        4. Identify 'negative_keywords' representing irrelevant contexts, parodies, press event spam, blog/generator screenshots, reviews, or other off-topic contexts that must be rejected.
         
         Return ONLY a raw, clean JSON object matching this schema:
         {{
           "core_subject": "...",
+          "is_real_person": true,
           "positive_keywords": ["word1", "word2", ...],
           "negative_keywords": ["word1", "word2", ...]
         }}
@@ -87,6 +89,7 @@ class AIVideoEditor:
         # Safe default spec in case of rate-limiting/errors
         spec = {
             "core_subject": topic,
+            "is_real_person": False,
             "positive_keywords": [w.lower() for w in topic.split() if len(w) > 2],
             "negative_keywords": ["infographic", "diagram", "news", "event", "poster", "chart", "map", "parody", "cartoon", "caricature", "illustration", "sketch", "drawing", "press", "bash", "success party", "red carpet", "paparazzi", "screenshot", "blog", "article", "generator", "best ai", "top 10", "how to"]
         }
@@ -101,10 +104,12 @@ class AIVideoEditor:
                 parsed = json.loads(content)
                 if isinstance(parsed, dict):
                     spec["core_subject"] = parsed.get("core_subject", topic)
+                    spec["is_real_person"] = bool(parsed.get("is_real_person", False))
                     spec["positive_keywords"] = [w.lower() for w in parsed.get("positive_keywords", []) if len(w) > 1]
                     spec["negative_keywords"] = [w.lower() for w in parsed.get("negative_keywords", []) if len(w) > 1]
                     print(f"✨ AI Dynamic Topic Analysis Complete for '{topic}':")
                     print(f"   Subject: {spec['core_subject']}")
+                    print(f"   Real Person: {spec['is_real_person']}")
                     print(f"   Positives: {spec['positive_keywords']}")
                     print(f"   Negatives: {spec['negative_keywords']}")
         except Exception as e:
@@ -227,13 +232,24 @@ class AIVideoEditor:
         # 1. Analyze topic dynamically with AI before querying search engines (Zero Hardcoding!)
         topic_spec = await self.analyze_topic_dynamically(topic)
         
-        styles = [
-            "vertical wallpaper",
-            "aesthetic vertical art",
-            "cinematic vertical portrait",
-            "dynamic lockscreen vertical art",
-            "concept digital art vertical"
-        ]
+        if topic_spec.get("is_real_person", False):
+            # Tailored high-quality photo styles for real people, celebrities, models, singers
+            styles = [
+                "vertical wallpaper",
+                "photoshoot vertical",
+                "vertical portrait",
+                "candid portrait vertical",
+                "cinematic photo vertical"
+            ]
+        else:
+            # Artistic and concept-oriented styles for abstract concepts, fictional characters, or objects
+            styles = [
+                "vertical wallpaper",
+                "aesthetic vertical art",
+                "cinematic vertical portrait",
+                "dynamic lockscreen vertical art",
+                "concept digital art vertical"
+            ]
         # Shuffle visual styles list on every run to query completely different aesthetics first
         random.shuffle(styles)
         
