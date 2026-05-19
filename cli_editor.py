@@ -236,14 +236,17 @@ class AIVideoEditor:
             if any(w in title or w in desc for w in neg_words):
                 continue
                 
-            # If multi-word dynamic positive, require ALL words to be present
-            # If single-word, require at least one word to be present
-            if len(pos_words) > 1:
-                if not all(w in title or w in desc for w in pos_words):
-                    continue
-            elif len(pos_words) == 1:
-                if not any(w in title or w in desc for w in pos_words):
-                    continue
+            # Check dynamic positive keywords: at least ONE of the positive keywords/phrases must match fully
+            has_positive = False
+            for kw in pos_words:
+                sub_kws = kw.split()
+                if sub_kws:
+                    # Require all sub-words within a single phrase to be present
+                    if all(sub_kw in title or sub_kw in desc for sub_kw in sub_kws):
+                        has_positive = True
+                        break
+            if not has_positive:
+                continue
                     
             valid_urls.append(res["url"])
                 
