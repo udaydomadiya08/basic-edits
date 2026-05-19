@@ -166,8 +166,8 @@ class SimpleScraper:
                 # Strategy A: Extract high-resolution external image redirects from legacy mobile anchor tags
                 for a in soup.find_all("a", href=True):
                     href = a["href"]
-                    if "/url?q=" in href:
-                        match = re.search(r'/url\?q=([^&]+)', href)
+                    if "imgurl=" in href or "/url?q=" in href:
+                        match = re.search(r'(?:imgurl|/url\?q)=([^&]+)', href)
                         if match:
                             dest_url = re.sub(r'&.*', '', requests.utils.unquote(match.group(1)))
                             if dest_url.startswith("http") and dest_url.lower().endswith((".jpg", ".jpeg", ".png")) and not any(domain in dest_url.lower() for domain in blacklist_domains):
