@@ -42,16 +42,18 @@ class AIVideoEditor:
         prompt = (
             f"You are an expert AI search query optimizer. Given a user input search topic, identify the core subject, "
             f"entity, concept, or character they are looking for. Resolve any typos, spelling mistakes, or ambiguous/messy "
-            f"descriptions (e.g., if they write a descriptive query, resolve it to the most clean, standard, and official name of that subject). "
-            f"If a music track context is provided, use it to intelligently resolve any contextual ambiguities in the topic.\n"
-            f"Return ONLY the official, correctly spelled name of the core subject. Do not explain, do not add quotes, just return the name.{song_context}\n"
+            f"descriptions. IMPORTANT: If the user provides a detailed, intentional artistic, visual, or aesthetic description "
+            f"(e.g. including terms like 'vaporwave', 'glitchcore', 'cyberpunk', 'dreamcore', 'surreal', 'cosmic', etc.), you MUST PRESERVE "
+            f"these rich visual style keywords, as they are crucial for media generation. Only resolve actual typos, spelling mistakes, "
+            f"or highly chaotic/unreadable inputs to a clean, well-spelled artistic prompt.\n"
+            f"Return ONLY the optimized, correctly spelled name of the topic. Do not explain, do not add quotes, just return the name.{song_context}\n"
             f"Topic: {topic}\n"
             f"Corrected Name:"
         )
         try:
             res = await self.router.get_response(prompt, category="text")
             corrected = res.get("content", "").strip()
-            if corrected and len(corrected) < 50:
+            if corrected and len(corrected) < 100:
                 return corrected
         except Exception:
             pass
@@ -65,16 +67,24 @@ class AIVideoEditor:
         return f"The Power of {topic.capitalize()}"
 
     async def analyze_topic_dynamically(self, topic: str) -> dict:
-        """Dynamically analyze the user input topic with AI to determine positive/negative criteria for zero-hardcoding auditing"""
+        """Dynamically analyze the user input topic with AI to determine positive/negative criteria and diverse search queries"""
         prompt = f"""
         You are an expert AI media auditor.
         Analyze the search topic: '{topic}'
         
-        Generate a highly precise JSON specification for validating scraped image metadata.
+        Generate a highly precise JSON specification for validating scraped image metadata and securing highly diverse search results.
         1. Identify the core subject/entity.
         2. Determine if this subject is a real-life person, model, actor, singer, or celebrity (is_real_person: true/false).
-        3. Identify 'positive_keywords' that MUST appear in candidate titles or descriptions to prove it is actually about this subject (e.g. ['jalebi', 'sweet'] for 'jalebi'; ['weeknd', 'starboy'] for 'The Weeknd').
-        4. Identify 'negative_keywords' representing irrelevant contexts, parodies, press event spam, blog/generator screenshots, reviews, or other off-topic contexts that must be rejected.
+        3. Identify 'positive_keywords' that MUST appear in candidate titles or descriptions to validate the subject.
+        4. Identify 'negative_keywords' to filter out junk contexts.
+        5. Generate a list of exactly 6 'search_queries' that are highly distinct, extremely visual, concrete scenes/variations related to the topic (e.g. for topic 'environment', do NOT just repeat 'environment vertical wallpaper'. Instead, generate 6 fully distinct physical sub-scenes like:
+           - "misty green pine forest vertical wallpaper"
+           - "vibrant coral reef deep sea vertical"
+           - "majestic alpine mountain lake lockscreen"
+           - "sunlit jungle rainforest digital art vertical"
+           - "breathtaking desert sand dunes portrait"
+           - "lush green rolling hills landscape vertical"
+           This is CRITICAL to avoid duplicate search results and secure a high count of beautiful, unique images.)
         
         Return ONLY a raw, clean JSON object matching this schema.
         Example output for topic 'Elon Musk':
@@ -82,7 +92,15 @@ class AIVideoEditor:
           "core_subject": "Elon Musk",
           "is_real_person": true,
           "positive_keywords": ["elon", "musk", "tesla", "spacex"],
-          "negative_keywords": ["infographic", "screenshot", "meme", "parody", "cartoon", "caricature"]
+          "negative_keywords": ["infographic", "screenshot", "meme", "parody"],
+          "search_queries": [
+            "elon musk cinematic portrait vertical",
+            "elon musk tesla launch vertical lockscreen",
+            "elon musk spacex presentation vertical",
+            "elon musk professional studio photo vertical",
+            "young elon musk vertical",
+            "elon musk dynamic art vertical"
+          ]
         }}
         
         STRICT: Do not provide any markdown, no explanation, no backticks, just the JSON string.
@@ -93,7 +111,15 @@ class AIVideoEditor:
             "core_subject": topic,
             "is_real_person": False,
             "positive_keywords": [w.lower() for w in topic.split() if len(w) > 2],
-            "negative_keywords": ["infographic", "diagram", "news", "event", "poster", "chart", "map", "parody", "cartoon", "caricature", "illustration", "sketch", "drawing", "press", "bash", "success party", "red carpet", "paparazzi", "screenshot", "blog", "article", "generator", "best ai", "top 10", "how to"]
+            "negative_keywords": ["infographic", "diagram", "news", "event", "poster", "chart", "map", "parody", "cartoon", "caricature", "illustration", "sketch", "drawing", "press", "bash", "success party", "red carpet", "paparazzi", "screenshot", "blog", "article", "generator", "best ai", "top 10", "how to"],
+            "search_queries": [
+                f"{topic} vertical wallpaper",
+                f"{topic} aesthetic vertical art",
+                f"{topic} cinematic vertical portrait",
+                f"{topic} dynamic lockscreen vertical art",
+                f"{topic} concept digital art vertical",
+                f"{topic} vertical"
+            ]
         }
         
         try:
@@ -114,6 +140,7 @@ class AIVideoEditor:
                     person_m = re.search(r'"is_real_person"\s*:\s*(true|false|"[^"]+")', content, re.IGNORECASE)
                     pos_m = re.search(r'"positive_keywords"\s*:\s*\[([^\]]*)\]', content)
                     neg_m = re.search(r'"negative_keywords"\s*:\s*\[([^\]]*)\]', content)
+                    queries_m = re.search(r'"search_queries"\s*:\s*\[([^\]]*)\]', content)
                     
                     parsed = {}
                     if subject_m:
@@ -125,17 +152,23 @@ class AIVideoEditor:
                         parsed["positive_keywords"] = [w.strip().strip('"').strip("'") for w in pos_m.group(1).split(",") if w.strip()]
                     if neg_m:
                         parsed["negative_keywords"] = [w.strip().strip('"').strip("'") for w in neg_m.group(1).split(",") if w.strip()]
+                    if queries_m:
+                        parsed["search_queries"] = [w.strip().strip('"').strip("'") for w in queries_m.group(1).split(",") if w.strip()]
                 
                 if parsed:
                     spec["core_subject"] = parsed.get("core_subject", topic)
                     spec["is_real_person"] = bool(parsed.get("is_real_person", False))
                     spec["positive_keywords"] = [w.lower() for w in parsed.get("positive_keywords", []) if len(w) > 1]
                     spec["negative_keywords"] = [w.lower() for w in parsed.get("negative_keywords", []) if len(w) > 1]
+                    if "search_queries" in parsed and isinstance(parsed["search_queries"], list):
+                        spec["search_queries"] = [q.strip() for q in parsed["search_queries"] if q.strip()]
+                    
                     print(f"✨ AI Dynamic Topic Analysis Complete for '{topic}':")
                     print(f"   Subject: {spec['core_subject']}")
                     print(f"   Real Person: {spec['is_real_person']}")
                     print(f"   Positives: {spec['positive_keywords']}")
                     print(f"   Negatives: {spec['negative_keywords']}")
+                    print(f"   Queries: {spec['search_queries']}")
         except Exception as e:
             logger.warning(f"Error during dynamic topic analysis: {e}")
             
@@ -210,7 +243,7 @@ class AIVideoEditor:
         
         return []
 
-    def filter_results_locally(self, topic, results, topic_spec=None):
+    def filter_results_locally(self, topic, results, topic_spec=None, active_query=None):
         """Ultra-resilient local fallback filter using dynamically generated AI criteria (Zero Hardcoding!)"""
         valid_urls = []
         
@@ -221,12 +254,22 @@ class AIVideoEditor:
             if not important_words:
                 important_words = [w for w in topic.lower().split() if len(w) > 1]
             topic_spec = {
+                "is_real_person": False,
                 "positive_keywords": important_words,
                 "negative_keywords": ["infographic", "diagram", "news", "event", "poster", "chart", "map", "parody", "cartoon", "caricature", "illustration", "sketch", "drawing", "press", "bash", "success party", "red carpet", "paparazzi", "screenshot", "blog", "article", "generator", "best ai", "top 10", "how to"]
             }
             
         pos_words = [w.lower() for w in topic_spec.get("positive_keywords", [])]
         neg_words = [w.lower() for w in topic_spec.get("negative_keywords", [])]
+        
+        # If we have an active sub-query, add its key words to the positive keywords list
+        active_words = []
+        if active_query:
+            # Exclude generic words
+            stop_words = {"the", "a", "an", "vertical", "wallpaper", "portrait", "lockscreen", "photo", "art", "aesthetic", "cinematic", "digital"}
+            active_words = [w.lower() for w in active_query.split() if w.lower() not in stop_words and len(w) > 2]
+        
+        is_real_person = topic_spec.get("is_real_person", False)
         
         for res in results:
             title = res.get("title", "").lower()
@@ -236,68 +279,95 @@ class AIVideoEditor:
             if any(w in title or w in desc for w in neg_words):
                 continue
                 
-            # Check dynamic positive keywords: at least ONE of the positive keywords/phrases must match fully
-            has_positive = False
-            for kw in pos_words:
-                sub_kws = kw.split()
-                if sub_kws:
-                    # Require all sub-words within a single phrase to be present
-                    if all(sub_kw in title or sub_kw in desc for sub_kw in sub_kws):
-                        has_positive = True
-                        break
-            if not has_positive:
-                continue
-                    
+            # For real people, enforce positive keyword matching strictly
+            if is_real_person:
+                has_positive = False
+                for kw in pos_words:
+                    sub_kws = kw.split()
+                    if sub_kws:
+                        # Require all sub-words within a single phrase to be present
+                        if all(sub_kw in title or sub_kw in desc for sub_kw in sub_kws):
+                            has_positive = True
+                            break
+                if not has_positive:
+                    continue
+            else:
+                # For non-celebrities (concepts/environments/objects), be much more lenient.
+                # If there are positive words or active query keywords, check if at least one is present.
+                combined_pos = pos_words + active_words
+                if combined_pos:
+                    has_match = False
+                    for kw in combined_pos:
+                        if kw in title or kw in desc:
+                            has_match = True
+                            break
+                    if not has_match:
+                        # Allow it anyway if the title contains at least one word from the topic or active query
+                        all_search_terms = [w.lower() for w in (topic + " " + (active_query or "")).split() if len(w) > 2]
+                        if not any(term in title or term in desc for term in all_search_terms):
+                            continue
+            
             valid_urls.append(res["url"])
                 
         return valid_urls
 
     async def fetch_images(self, topic, count=15):
         all_paths = []
-        attempts = 0
+        seen_urls = set()
         
-        # 1. Analyze topic dynamically with AI before querying search engines (Zero Hardcoding!)
+        # 1. Analyze topic dynamically with AI before querying search engines (Exactly 1 LLM call!)
         topic_spec = await self.analyze_topic_dynamically(topic)
         
-        if topic_spec.get("is_real_person", False):
-            # Tailored high-quality photo styles for real people, celebrities, models, singers
-            styles = [
-                "vertical wallpaper",
-                "photoshoot vertical",
-                "vertical portrait",
-                "candid portrait vertical",
-                "cinematic photo vertical"
-            ]
-        else:
-            # Artistic and concept-oriented styles for abstract concepts, fictional characters, or objects
-            styles = [
-                "vertical wallpaper",
-                "aesthetic vertical art",
-                "cinematic vertical portrait",
-                "dynamic lockscreen vertical art",
-                "concept digital art vertical"
-            ]
-        # Shuffle visual styles list on every run to query completely different aesthetics first
-        random.shuffle(styles)
+        search_queries = topic_spec.get("search_queries", [])
+        # If the model didn't return any search queries, construct 6 default ones
+        if not search_queries:
+            if topic_spec.get("is_real_person", False):
+                search_queries = [
+                    f"{topic} vertical wallpaper",
+                    f"{topic} photoshoot vertical",
+                    f"{topic} vertical portrait",
+                    f"{topic} candid portrait vertical",
+                    f"{topic} cinematic photo vertical",
+                    f"{topic} professional studio photo vertical"
+                ]
+            else:
+                search_queries = [
+                    f"{topic} vertical wallpaper",
+                    f"{topic} aesthetic vertical art",
+                    f"{topic} cinematic vertical portrait",
+                    f"{topic} dynamic lockscreen vertical art",
+                    f"{topic} concept digital art vertical",
+                    f"{topic} vertical"
+                ]
         
-        while len(all_paths) < count and attempts < len(styles):
-            style = styles[attempts]
-            attempts += 1
-            print(f"🔍 Search Attempt {attempts} (Style: {style}, Got: {len(all_paths)}/{count})...")
+        # Loop over the 6 sub-queries
+        query_idx = 0
+        while len(all_paths) < count and query_idx < len(search_queries):
+            active_query = search_queries[query_idx]
+            query_idx += 1
+            print(f"🔍 Search Attempt {query_idx} (Query: '{active_query}', Got: {len(all_paths)}/{count})...")
             
-            # Universal Super-Scraper Pipeline: Case-insensitively deduplicate words to prevent duplicate terms like "vertical vertical"
+            # Universal Super-Scraper Pipeline: Case-insensitively deduplicate words
             query_words = []
-            for word in f"{topic} {style}".split():
+            for word in active_query.split():
                 if word.lower() not in [w.lower() for w in query_words]:
                     query_words.append(word)
             main_query = " ".join(query_words)
-            stock_query = main_query
             
-            print(f"🔍 Multi-Scraping Pexels, Bing, Google, DDG & Yahoo for '{style}' style...")
+            # Optimize Pexels query: Extract core visual terms (exclude generic vertical wallpaper style words)
+            stop_words = {"the", "a", "an", "vertical", "wallpaper", "portrait", "lockscreen", "photo", "art", "aesthetic", "cinematic", "digital"}
+            pexels_words = [w for w in query_words if w.lower() not in stop_words]
+            if not pexels_words:
+                pexels_words = [w for w in query_words if len(w) > 2]
+            # Use the first 2-3 core words for Pexels to avoid returning 0 results
+            stock_query = " ".join(pexels_words[:3])
+            
+            print(f"🔍 Multi-Scraping Pexels, Bing, Google, DDG & Yahoo for query: '{main_query}'...")
             candidates = []
             
             # 1. Pexels (premium stock photos)
             try:
+                print(f"   Searching Pexels with optimized query: '{stock_query}'")
                 candidates += self.scraper.search_pexels(stock_query, 40)
             except Exception as e:
                 logger.warning(f"Pexels error: {e}")
@@ -321,29 +391,93 @@ class AIVideoEditor:
                     candidates += self.scraper.search_yahoo(main_query, 40)
                 except Exception as e:
                     logger.warning(f"DDG/Yahoo error: {e}")
+                    
+            # 5. Self-Healing Fallback for niche/abstract long queries
+            if len(candidates) < 15 and len(query_words) > 4:
+                # Keep the first 3 core words, plus the last word if it contains layout/wallpaper terms
+                core_words = query_words[:3]
+                if query_words[-1].lower() in {"vertical", "wallpaper", "portrait", "lockscreen"}:
+                    core_words.append(query_words[-1])
+                fallback_query = " ".join(core_words)
+                
+                print(f"⚠️ Query '{main_query}' returned too few results ({len(candidates)}). Retrying with self-healing fallback: '{fallback_query}'...")
+                try:
+                    candidates += self.scraper.search_bing(fallback_query, 60)
+                    candidates += self.scraper.search_duckduckgo(fallback_query, 60)
+                except Exception as e:
+                    logger.warning(f"Self-healing fallback error: {e}")
             
-            # Shuffle scraped candidates list to ensure a unique selection of images is filtered and downloaded
-            random.shuffle(candidates)
+            # De-duplicate candidates at URL level and filter out already seen URLs
+            unique_candidates = []
+            for c in candidates:
+                url = c.get("url")
+                if url and url not in seen_urls:
+                    seen_urls.add(url)
+                    unique_candidates.append(c)
             
-            # AI Filter using dynamically generated specifications
-            verified_urls = await self.filter_results_with_ai(topic, candidates, topic_spec=topic_spec)
+            # Shuffle scraped candidates list to ensure a unique selection of images
+            random.shuffle(unique_candidates)
             
-            # Resilient local fallback using dynamically generated specifications
-            if not verified_urls:
-                print("⚠️ AI Filter rate-limited or unavailable. Activating ultra-resilient local metadata filter...")
-                verified_urls = self.filter_results_locally(topic, candidates, topic_spec=topic_spec)
+            # Fast, high-resiliency local filtering using dynamically generated specifications and active query keywords
+            verified_urls = self.filter_results_locally(topic, unique_candidates, topic_spec=topic_spec, active_query=active_query)
             
             # Download
             if verified_urls:
-                download_results = await self.downloader.bulk_download(verified_urls, topic)
+                # Limit the download batch to what we actually need to avoid over-downloading
+                needed = count - len(all_paths)
+                download_batch = verified_urls[:max(needed + 3, 8)]
+                download_results = await self.downloader.bulk_download(download_batch, topic)
                 for r in download_results:
                     if r["path"] not in all_paths:
                         all_paths.append(r["path"])
             
             if len(all_paths) >= count:
                 break
-            print(f"🔄 Need more images. Successfully got {len(all_paths)} so far. Retrying...")
+            print(f"🔄 Need more images. Successfully got {len(all_paths)} so far. Moving to next sub-query...")
             
+        # 2. Broad Fallback Search Loop (If we are still short of the target count after all sub-queries)
+        if len(all_paths) < count:
+            print(f"⚠️ Primary sub-queries exhausted. Still short of target ({len(all_paths)}/{count}). Activating broad fallback searches...")
+            broad_queries = [
+                f"{topic} aesthetic vertical",
+                f"{topic} vertical",
+                f"{topic} wallpaper",
+                topic
+            ]
+            for b_query in broad_queries:
+                if len(all_paths) >= count:
+                    break
+                print(f"🔍 Broad Fallback Search for '{b_query}'...")
+                candidates = []
+                try:
+                    candidates += self.scraper.search_bing(b_query, 60)
+                    candidates += self.scraper.search_pexels(topic, 40)
+                except:
+                    pass
+                if len(candidates) < 20:
+                    try:
+                        candidates += self.scraper.search_duckduckgo(b_query, 60)
+                    except:
+                        pass
+                
+                unique_candidates = []
+                for c in candidates:
+                    url = c.get("url")
+                    if url and url not in seen_urls:
+                        seen_urls.add(url)
+                        unique_candidates.append(c)
+                
+                random.shuffle(unique_candidates)
+                verified_urls = self.filter_results_locally(topic, unique_candidates, topic_spec=topic_spec, active_query=b_query)
+                    
+                if verified_urls:
+                    needed = count - len(all_paths)
+                    download_batch = verified_urls[:max(needed + 3, 8)]
+                    download_results = await self.downloader.bulk_download(download_batch, topic)
+                    for r in download_results:
+                        if r["path"] not in all_paths:
+                            all_paths.append(r["path"])
+                            
         if not all_paths:
             print("❌ Failure: No images could be secured.")
             return []
@@ -480,30 +614,69 @@ class AIVideoEditor:
  
  
 async def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="AI Beat-Synced Video Editor")
+    parser.add_argument("--song", type=int, help="Index of the song to use")
+    parser.add_argument("--topic", type=str, help="Search topic for images")
+    parser.add_argument("--hook", type=str, choices=['y', 'n', 'yes', 'no'], help="Include introductory hook/title phase (y/N)")
+    parser.add_argument("--duration", type=float, help="Target edit duration in seconds")
+    
+    args = parser.parse_args()
+    
     editor = AIVideoEditor()
     songs = editor.list_music()
-    if not songs: return
-    for i, song in enumerate(songs): print(f"[{i}] {song}")
-    try:
-        song_idx = int(input("\nEnter song number: "))
-        selected_song = os.path.join(editor.music_dir, songs[song_idx])
-    except: return
-    topic = input("Enter topic: ")
-    if not topic: return
+    if not songs:
+        print("❌ No songs found in music directory.")
+        return
+        
+    # Determine selected song
+    if args.song is not None:
+        song_idx = args.song
+    else:
+        for i, song in enumerate(songs):
+            print(f"[{i}] {song}")
+        try:
+            song_idx = int(input("\nEnter song number: "))
+        except:
+            return
+
+    if song_idx < 0 or song_idx >= len(songs):
+        print(f"❌ Invalid song index: {song_idx}")
+        return
+        
+    selected_song = os.path.join(editor.music_dir, songs[song_idx])
     
+    # Determine topic
+    if args.topic is not None:
+        topic = args.topic
+    else:
+        topic = input("Enter topic: ")
+        if not topic:
+            return
+            
     corrected_topic = await editor.get_autocorrected_topic(topic, songs[song_idx])
     if corrected_topic.lower() != topic.lower():
         print(f"🪄 Autocorrected search term: '{topic}' ➔ '{corrected_topic}'")
         topic = corrected_topic
-    print("Include introductory hook/title phase? (y/N): ")
-    use_hook = input("Include introductory hook/title phase? (y/N): ").strip().lower() == 'y'
-    print("Enter target edit duration in seconds (default 10): ")
-    dur_input = input("Enter target edit duration in seconds (default 10): ").strip()
-    try:
-        target_duration = float(dur_input) if dur_input else 10.0
-    except ValueError:
-        target_duration = 10.0
         
+    # Determine hook option
+    if args.hook is not None:
+        use_hook = args.hook.lower() in ('y', 'yes')
+    else:
+        print("Include introductory hook/title phase? (y/N): ")
+        use_hook = input("Include introductory hook/title phase? (y/N): ").strip().lower() == 'y'
+        
+    # Determine duration
+    if args.duration is not None:
+        target_duration = args.duration
+    else:
+        print("Enter target edit duration in seconds (default 10): ")
+        dur_input = input("Enter target edit duration in seconds (default 10): ").strip()
+        try:
+            target_duration = float(dur_input) if dur_input else 10.0
+        except ValueError:
+            target_duration = 10.0
+            
     hook_phrase = ""
     if use_hook:
         hook_phrase = await editor.get_hook_phrase(topic)
@@ -512,7 +685,8 @@ async def main():
     # Dynamically scale required images based on duration (minimum 15, approx 2.5 per second to avoid looping)
     img_count = max(15, int(target_duration * 2.5))
     image_paths = await editor.fetch_images(topic, count=img_count)
-    if not image_paths: return
+    if not image_paths:
+        return
     editor.create_video(topic, hook_phrase, image_paths, selected_song, topic.replace(' ','_'), use_hook=use_hook, target_duration=target_duration)
  
 if __name__ == "__main__": asyncio.run(main())

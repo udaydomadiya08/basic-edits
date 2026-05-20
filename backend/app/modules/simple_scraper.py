@@ -16,6 +16,12 @@ class SimpleScraper:
             "Accept-Language": "en-US,en;q=0.5",
             "Referer": "https://www.google.com/"
         }
+        self.blacklist = [
+            "thehindu.com", "starofmysore.com", "prokerala.com", "pinterest.com", "pinimg.com",
+            "shutterstock.com", "istockphoto.com", "whatshot.in", "fineartamerica.com",
+            "wallpapersafari.com", "wallpapertag.com", "wallpaperaccess.com", "rare-gallery.com",
+            "wallpapercave.com", "googleusercontent.com", "adsystem.com", "doubleclick.net"
+        ]
 
     def log(self, message):
         if self.log_callback:
@@ -27,7 +33,6 @@ class SimpleScraper:
         query += " -news -event -text -logo -watermark"
         self.log(f"Bing search for '{query}' (Offset: {offset_start})...")
         
-        blacklist = ["thehindu.com", "starofmysore.com", "prokerala.com", "pinterest.com", "shutterstock.com", "istockphoto.com", "whatshot.in"]
         results = []
         try:
             offset = offset_start
@@ -48,7 +53,7 @@ class SimpleScraper:
                             murl = m_data.get("murl")
                             if murl:
                                 # Blacklist Check
-                                if any(domain in murl.lower() for domain in blacklist):
+                                if any(domain in murl.lower() for domain in self.blacklist):
                                     continue
                                     
                                 results.append({
@@ -69,7 +74,6 @@ class SimpleScraper:
         query += " -news -event -text -logo -watermark"
         self.log(f"DDG search for '{query}'...")
         
-        blacklist = ["thehindu.com", "starofmysore.com", "prokerala.com", "pinterest.com", "shutterstock.com", "istockphoto.com", "whatshot.in"]
         results = []
         try:
             res = requests.get(f"https://duckduckgo.com/?q={query}&kp=-2", headers=self.headers)
@@ -84,7 +88,7 @@ class SimpleScraper:
                     img_url = result.get("image")
                     if img_url:
                         # Blacklist Check
-                        if any(domain in img_url.lower() for domain in blacklist):
+                        if any(domain in img_url.lower() for domain in self.blacklist):
                             continue
                             
                         results.append({
@@ -161,7 +165,6 @@ class SimpleScraper:
                 raw_html = res.text
                 soup = BeautifulSoup(raw_html, 'html.parser')
                 seen = set()
-                blacklist_domains = ["googleusercontent.com", "adsystem.com", "doubleclick.net"]
                 
                 # Strategy A: Extract high-resolution external image redirects from legacy mobile anchor tags
                 for a in soup.find_all("a", href=True):
@@ -170,7 +173,9 @@ class SimpleScraper:
                         match = re.search(r'(?:imgurl|/url\?q)=([^&]+)', href)
                         if match:
                             dest_url = re.sub(r'&.*', '', requests.utils.unquote(match.group(1)))
-                            if dest_url.startswith("http") and dest_url.lower().endswith((".jpg", ".jpeg", ".png")) and not any(domain in dest_url.lower() for domain in blacklist_domains):
+                            # Split on ? and # to accurately verify image file extensions
+                            clean_url = dest_url.split("?")[0].split("#")[0]
+                            if dest_url.startswith("http") and any(ext in clean_url.lower() for ext in [".jpg", ".jpeg", ".png", ".webp"]) and not any(domain in dest_url.lower() for domain in self.blacklist):
                                 if dest_url not in seen:
                                     seen.add(dest_url)
                                     results.append({
@@ -183,10 +188,11 @@ class SimpleScraper:
                                         
                 # Strategy B: Fallback to high-res Javascript regex payload extraction
                 if not results:
-                    all_urls = re.findall(r'(https?://[^\s"\';\\<>]+?\.(?:jpg|jpeg|png))', raw_html)
+                    decoded_html = raw_html.replace("\\/", "/").replace("\\u003d", "=").replace("\\u0026", "&").replace("\\\\", "\\")
+                    # Capture URLs containing image extensions with potential trailing query strings
+                    all_urls = re.findall(r'(https?://[^\s"\';\\<>]+?(?:\.jpg|\.jpeg|\.png|\.webp)(?:[^\s"\';\\<>]*))', decoded_html, re.IGNORECASE)
                     for img_url in all_urls:
-                        img_url = img_url.replace("\\u003d", "=").replace("\\u0026", "&").replace("\\", "")
-                        if any(domain in img_url.lower() for domain in blacklist_domains):
+                        if any(domain in img_url.lower() for domain in self.blacklist):
                             continue
                         if img_url not in seen:
                             seen.add(img_url)
